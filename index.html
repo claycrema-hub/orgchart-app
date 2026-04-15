@@ -12,10 +12,10 @@
   *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
   html,body{height:100%;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:#f8fafc;color:#0f172a}
   #root{height:100%}
-  input:focus{border-color:#6366f1!important;box-shadow:0 0 0 3px rgba(99,102,241,0.12)!important}
-  button:hover{opacity:0.9}
+  input:focus{border-color:#6366f1!important;box-shadow:0 0 0 3px rgba(99,102,241,0.12)!important;outline:none}
   @keyframes spin{to{transform:rotate(360deg)}}
-  @keyframes fadeIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+  @keyframes fadeIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
+  .drag-hint{font-size:12px;color:#94a3b8;text-align:center;padding:6px;pointer-events:none}
 </style>
 </head>
 <body>
@@ -23,184 +23,138 @@
 
 <script>
 // ─── Pre-loaded Company Data ──────────────────────────────────────────────────
-// Add new companies here using the same format.
-// Claude can generate this data for you — just ask!
 const COMPANIES = {
-  workday: {
-    company:"Workday", domain:"workday.com",
-    sources:["workday.com/leadership","LinkedIn","Clay"],
-    people:[
-      {id:"1",name:"Aneel Bhusri",title:"Co-CEO & Co-Founder",parentId:null,department:"Executive"},
-      {id:"2",name:"Zane Rowe",title:"CFO",parentId:"1",department:"Finance"},
-      {id:"3",name:"Gerrit Kazmaier",title:"President, Products & Technology",parentId:"1",department:"Product"},
-      {id:"4",name:"Gabe Monroy",title:"CTO",parentId:"3",department:"Engineering"},
-      {id:"5",name:"Rob Enslin",title:"President, Go-to-Market",parentId:"1",department:"Sales"},
-      {id:"6",name:"Emma Chalwin",title:"CMO",parentId:"1",department:"Marketing"},
-      {id:"7",name:"Ashley Goldsmith",title:"CPO (People)",parentId:"1",department:"HR"},
-      {id:"8",name:"Rani Johnson",title:"CIO",parentId:"1",department:"IT"},
-      {id:"9",name:"Sheri Rhodes",title:"CCO",parentId:"1",department:"Customer Success"},
-      {id:"10",name:"Rich Sauer",title:"CLO & Head of Corporate Affairs",parentId:"1",department:"Legal"},
-      {id:"11",name:"Patrick Blair",title:"CRO",parentId:"5",department:"Sales"},
-      {id:"12",name:"Kumari Williams",title:"Chief VIBE Officer",parentId:"1",department:"DEI"},
-      {id:"13",name:"Angelique de Vries",title:"President, EMEA",parentId:"5",department:"Sales"},
-      {id:"14",name:"Sunil Jose",title:"President, India",parentId:"5",department:"Sales"},
-      {id:"15",name:"Athena Karp",title:"SVP, AI",parentId:"3",department:"Product"},
-      {id:"16",name:"Jerry Ting",title:"VP, Agentic AI",parentId:"15",department:"Product"},
-      {id:"17",name:"Annette Melatti",title:"VP, CFO Marketing",parentId:"6",department:"Marketing"},
-      {id:"18",name:"Joe DosSantos",title:"VP, Data",parentId:"3",department:"Engineering"},
-    ]
-  },
-  nike: {
-    company:"Nike", domain:"nike.com",
-    sources:["about.nike.com","Clay","LinkedIn"],
-    people:[
-      {id:"1",name:"Elliott Hill",title:"President & CEO",parentId:null,department:"Executive"},
-      {id:"2",name:"Matthew Friend",title:"EVP & CFO",parentId:"1",department:"Finance"},
-      {id:"3",name:"Venkatesh Alagirisamy",title:"COO",parentId:"1",department:"Operations"},
-      {id:"4",name:"Amy Montagne",title:"President, Nike Brand",parentId:"1",department:"Brand"},
-      {id:"5",name:"Rob Leinwand",title:"EVP & CLO",parentId:"1",department:"Legal"},
-      {id:"6",name:"Nicole Hubbard Graham",title:"CMO",parentId:"4",department:"Marketing"},
-      {id:"7",name:"Michael Gonda",title:"EVP, Chief Communications Officer",parentId:"4",department:"Comms"},
-      {id:"8",name:"Ann Miller",title:"EVP, Sports Marketing",parentId:"6",department:"Marketing"},
-      {id:"9",name:"Neil Potter",title:"VP, Soccer Marketing",parentId:"6",department:"Marketing"},
-      {id:"10",name:"Kamauri Yeh",title:"VP, Digital Marketing",parentId:"6",department:"Marketing"},
-      {id:"11",name:"Shine Thomas",title:"VP, Talent Acquisition",parentId:"1",department:"HR"},
-      {id:"12",name:"Jason Mayden",title:"VP, Jordan Brand",parentId:"4",department:"Brand"},
-      {id:"13",name:"Jorge Casimiro",title:"VP, Government Affairs",parentId:"5",department:"Legal"},
-    ]
-  },
-  salesforce: {
-    company:"Salesforce", domain:"salesforce.com",
-    sources:["salesforce.com/news","LinkedIn"],
-    people:[
-      {id:"1",name:"Marc Benioff",title:"Chair & CEO",parentId:null,department:"Executive"},
-      {id:"2",name:"Amy Weaver",title:"President & CFO",parentId:"1",department:"Finance"},
-      {id:"3",name:"Brian Millham",title:"President & COO",parentId:"1",department:"Operations"},
-      {id:"4",name:"Ariel Kelman",title:"President & CMO",parentId:"1",department:"Marketing"},
-      {id:"5",name:"Nathalie Scardino",title:"President & CPO",parentId:"1",department:"Product"},
-      {id:"6",name:"Srinivas Tallapragada",title:"President, Engineering",parentId:"1",department:"Engineering"},
-      {id:"7",name:"Miguel Milano",title:"President, Salesforce International",parentId:"3",department:"Sales"},
-      {id:"8",name:"Clara Shih",title:"CEO, Salesforce AI",parentId:"5",department:"Product"},
-      {id:"9",name:"Robin Washington",title:"Lead Independent Board Director",parentId:"1",department:"Executive"},
-      {id:"10",name:"David Schmaier",title:"President & Chief Customer Officer",parentId:"3",department:"Customer Success"},
-      {id:"11",name:"Steve Fisher",title:"EVP, Salesforce Platform",parentId:"5",department:"Product"},
-      {id:"12",name:"Padmanabhan Krishnamurthy",title:"EVP & CFO, Americas",parentId:"3",department:"Sales"},
-    ]
-  },
-  servicenow: {
-    company:"ServiceNow", domain:"servicenow.com",
-    sources:["servicenow.com/company","LinkedIn"],
-    people:[
-      {id:"1",name:"Bill McDermott",title:"Chairman & CEO",parentId:null,department:"Executive"},
-      {id:"2",name:"Gina Mastantuono",title:"CFO",parentId:"1",department:"Finance"},
-      {id:"3",name:"CJ Desai",title:"President & COO",parentId:"1",department:"Operations"},
-      {id:"4",name:"Jon Sigler",title:"Chief Product Officer",parentId:"1",department:"Product"},
-      {id:"5",name:"Paul Smith",title:"Chief Revenue Officer",parentId:"1",department:"Sales"},
-      {id:"6",name:"Amy Lokey",title:"SVP, Customer Experience",parentId:"3",department:"Customer Success"},
-      {id:"7",name:"Jacqui Canney",title:"Chief People Officer",parentId:"1",department:"HR"},
-      {id:"8",name:"Russell Elmer",title:"General Counsel",parentId:"1",department:"Legal"},
-      {id:"9",name:"Nicholas Tzitzon",title:"EVP, Strategy & Corporate Affairs",parentId:"1",department:"Strategy"},
-      {id:"10",name:"Dorit Zilber",title:"SVP, Global Alliances",parentId:"5",department:"Sales"},
-      {id:"11",name:"Rohit Bedi",title:"SVP, Americas Sales",parentId:"5",department:"Sales"},
-    ]
-  },
-  snowflake: {
-    company:"Snowflake", domain:"snowflake.com",
-    sources:["investors.snowflake.com","LinkedIn"],
-    people:[
-      {id:"1",name:"Sridhar Ramaswamy",title:"CEO",parentId:null,department:"Executive"},
-      {id:"2",name:"Mike Scarpelli",title:"CFO",parentId:"1",department:"Finance"},
-      {id:"3",name:"Prasanna Krishnan",title:"President, Product",parentId:"1",department:"Product"},
-      {id:"4",name:"Chris Degnan",title:"Chief Revenue Officer",parentId:"1",department:"Sales"},
-      {id:"5",name:"Christian Kleinerman",title:"SVP, Product",parentId:"3",department:"Product"},
-      {id:"6",name:"Denise Persson",title:"CMO",parentId:"1",department:"Marketing"},
-      {id:"7",name:"Lisa Daniels",title:"VP, Engineering",parentId:"3",department:"Engineering"},
-      {id:"8",name:"Tyler Prince",title:"EVP, Alliances & Channels",parentId:"4",department:"Sales"},
-      {id:"9",name:"Kieran Kennedy",title:"SVP, Americas Sales",parentId:"4",department:"Sales"},
-    ]
-  },
-  hubspot: {
-    company:"HubSpot", domain:"hubspot.com",
-    sources:["hubspot.com/company","LinkedIn"],
-    people:[
-      {id:"1",name:"Yamini Rangan",title:"CEO",parentId:null,department:"Executive"},
-      {id:"2",name:"Kate Bueker",title:"CFO",parentId:"1",department:"Finance"},
-      {id:"3",name:"Andy Pitre",title:"EVP, Product",parentId:"1",department:"Product"},
-      {id:"4",name:"Christian Kinnear",title:"Chief Sales Officer",parentId:"1",department:"Sales"},
-      {id:"5",name:"Kieran Flanagan",title:"EVP, Marketing",parentId:"1",department:"Marketing"},
-      {id:"6",name:"Katie Burke",title:"Chief People Officer",parentId:"1",department:"HR"},
-      {id:"7",name:"Mark Roberge",title:"SVP, Sales",parentId:"4",department:"Sales"},
-      {id:"8",name:"Nicholas Holland",title:"VP, Marketing Products",parentId:"3",department:"Product"},
-    ]
-  },
-  zendesk: {
-    company:"Zendesk", domain:"zendesk.com",
-    sources:["zendesk.com/company","LinkedIn"],
-    people:[
-      {id:"1",name:"Tom Eggemeier",title:"CEO",parentId:null,department:"Executive"},
-      {id:"2",name:"Michelle Chang",title:"CFO",parentId:"1",department:"Finance"},
-      {id:"3",name:"Shashi Upadhyay",title:"President, Product & Technology",parentId:"1",department:"Product"},
-      {id:"4",name:"Colleen Berube",title:"CIO & SVP, Operations",parentId:"1",department:"IT"},
-      {id:"5",name:"Scott Liang",title:"SVP, Engineering",parentId:"3",department:"Engineering"},
-      {id:"6",name:"Kelly Waldher",title:"CMO",parentId:"1",department:"Marketing"},
-      {id:"7",name:"Jill Macko",title:"Chief People Officer",parentId:"1",department:"HR"},
-    ]
-  },
-  databricks: {
-    company:"Databricks", domain:"databricks.com",
-    sources:["databricks.com/company","LinkedIn"],
-    people:[
-      {id:"1",name:"Ali Ghodsi",title:"Co-Founder & CEO",parentId:null,department:"Executive"},
-      {id:"2",name:"Dave Mariani",title:"Co-Founder",parentId:"1",department:"Executive"},
-      {id:"3",name:"Matei Zaharia",title:"Co-Founder & CTO",parentId:"1",department:"Engineering"},
-      {id:"4",name:"Naveen Rao",title:"SVP, AI",parentId:"1",department:"Product"},
-      {id:"5",name:"Chris Nicholas",title:"CFO",parentId:"1",department:"Finance"},
-      {id:"6",name:"Bryan Smith",title:"VP, Marketing",parentId:"1",department:"Marketing"},
-      {id:"7",name:"Mike Olson",title:"SVP, Alliances",parentId:"1",department:"Partnerships"},
-    ]
-  }
+  workday:{company:"Workday",domain:"workday.com",sources:["workday.com","LinkedIn","Clay"],people:[
+    {id:"1",name:"Aneel Bhusri",title:"Co-CEO & Co-Founder",parentId:null,department:"Executive"},
+    {id:"2",name:"Zane Rowe",title:"CFO",parentId:"1",department:"Finance"},
+    {id:"3",name:"Gerrit Kazmaier",title:"President, Products & Technology",parentId:"1",department:"Product"},
+    {id:"4",name:"Gabe Monroy",title:"CTO",parentId:"3",department:"Engineering"},
+    {id:"5",name:"Rob Enslin",title:"President, Go-to-Market",parentId:"1",department:"Sales"},
+    {id:"6",name:"Emma Chalwin",title:"CMO",parentId:"1",department:"Marketing"},
+    {id:"7",name:"Ashley Goldsmith",title:"CPO (People)",parentId:"1",department:"HR"},
+    {id:"8",name:"Rani Johnson",title:"CIO",parentId:"1",department:"IT"},
+    {id:"9",name:"Sheri Rhodes",title:"CCO",parentId:"1",department:"Customer"},
+    {id:"10",name:"Rich Sauer",title:"CLO & Head of Corporate Affairs",parentId:"1",department:"Legal"},
+    {id:"11",name:"Patrick Blair",title:"CRO",parentId:"5",department:"Sales"},
+    {id:"12",name:"Kumari Williams",title:"Chief VIBE Officer",parentId:"1",department:"DEI"},
+    {id:"13",name:"Angelique de Vries",title:"President, EMEA",parentId:"5",department:"Sales"},
+    {id:"14",name:"Sunil Jose",title:"President, India",parentId:"5",department:"Sales"},
+    {id:"15",name:"Athena Karp",title:"SVP, AI",parentId:"3",department:"Product"},
+    {id:"16",name:"Jerry Ting",title:"VP, Agentic AI",parentId:"15",department:"Product"},
+    {id:"17",name:"Annette Melatti",title:"VP, CFO Marketing",parentId:"6",department:"Marketing"},
+    {id:"18",name:"Joe DosSantos",title:"VP, Data",parentId:"3",department:"Engineering"},
+  ]},
+  nike:{company:"Nike",domain:"nike.com",sources:["about.nike.com","Clay","LinkedIn"],people:[
+    {id:"1",name:"Elliott Hill",title:"President & CEO",parentId:null,department:"Executive"},
+    {id:"2",name:"Matthew Friend",title:"EVP & CFO",parentId:"1",department:"Finance"},
+    {id:"3",name:"Venkatesh Alagirisamy",title:"COO",parentId:"1",department:"Operations"},
+    {id:"4",name:"Amy Montagne",title:"President, Nike Brand",parentId:"1",department:"Brand"},
+    {id:"5",name:"Rob Leinwand",title:"EVP & CLO",parentId:"1",department:"Legal"},
+    {id:"6",name:"Nicole Hubbard Graham",title:"CMO",parentId:"4",department:"Marketing"},
+    {id:"7",name:"Michael Gonda",title:"EVP, Chief Communications Officer",parentId:"4",department:"Comms"},
+    {id:"8",name:"Ann Miller",title:"EVP, Sports Marketing",parentId:"6",department:"Marketing"},
+    {id:"9",name:"Neil Potter",title:"VP, Soccer Marketing",parentId:"6",department:"Marketing"},
+    {id:"10",name:"Kamauri Yeh",title:"VP, Digital Marketing",parentId:"6",department:"Marketing"},
+    {id:"11",name:"Shine Thomas",title:"VP, Talent Acquisition",parentId:"1",department:"HR"},
+    {id:"12",name:"Jason Mayden",title:"VP, Jordan Brand",parentId:"4",department:"Brand"},
+    {id:"13",name:"Jorge Casimiro",title:"VP, Government Affairs",parentId:"5",department:"Legal"},
+  ]},
+  salesforce:{company:"Salesforce",domain:"salesforce.com",sources:["salesforce.com","LinkedIn"],people:[
+    {id:"1",name:"Marc Benioff",title:"Chair & CEO",parentId:null,department:"Executive"},
+    {id:"2",name:"Amy Weaver",title:"President & CFO",parentId:"1",department:"Finance"},
+    {id:"3",name:"Brian Millham",title:"President & COO",parentId:"1",department:"Operations"},
+    {id:"4",name:"Ariel Kelman",title:"President & CMO",parentId:"1",department:"Marketing"},
+    {id:"5",name:"Nathalie Scardino",title:"President & CPO",parentId:"1",department:"Product"},
+    {id:"6",name:"Srinivas Tallapragada",title:"President, Engineering",parentId:"1",department:"Engineering"},
+    {id:"7",name:"Miguel Milano",title:"President, Salesforce International",parentId:"3",department:"Sales"},
+    {id:"8",name:"Clara Shih",title:"CEO, Salesforce AI",parentId:"5",department:"Product"},
+    {id:"9",name:"David Schmaier",title:"President & Chief Customer Officer",parentId:"3",department:"Customer"},
+    {id:"10",name:"Steve Fisher",title:"EVP, Salesforce Platform",parentId:"5",department:"Product"},
+  ]},
+  servicenow:{company:"ServiceNow",domain:"servicenow.com",sources:["servicenow.com","LinkedIn"],people:[
+    {id:"1",name:"Bill McDermott",title:"Chairman & CEO",parentId:null,department:"Executive"},
+    {id:"2",name:"Gina Mastantuono",title:"CFO",parentId:"1",department:"Finance"},
+    {id:"3",name:"CJ Desai",title:"President & COO",parentId:"1",department:"Operations"},
+    {id:"4",name:"Jon Sigler",title:"Chief Product Officer",parentId:"1",department:"Product"},
+    {id:"5",name:"Paul Smith",title:"Chief Revenue Officer",parentId:"1",department:"Sales"},
+    {id:"6",name:"Amy Lokey",title:"SVP, Customer Experience",parentId:"3",department:"Customer"},
+    {id:"7",name:"Jacqui Canney",title:"Chief People Officer",parentId:"1",department:"HR"},
+    {id:"8",name:"Russell Elmer",title:"General Counsel",parentId:"1",department:"Legal"},
+    {id:"9",name:"Rohit Bedi",title:"SVP, Americas Sales",parentId:"5",department:"Sales"},
+  ]},
+  snowflake:{company:"Snowflake",domain:"snowflake.com",sources:["snowflake.com","LinkedIn"],people:[
+    {id:"1",name:"Sridhar Ramaswamy",title:"CEO",parentId:null,department:"Executive"},
+    {id:"2",name:"Mike Scarpelli",title:"CFO",parentId:"1",department:"Finance"},
+    {id:"3",name:"Prasanna Krishnan",title:"President, Product",parentId:"1",department:"Product"},
+    {id:"4",name:"Chris Degnan",title:"Chief Revenue Officer",parentId:"1",department:"Sales"},
+    {id:"5",name:"Christian Kleinerman",title:"SVP, Product",parentId:"3",department:"Product"},
+    {id:"6",name:"Denise Persson",title:"CMO",parentId:"1",department:"Marketing"},
+    {id:"7",name:"Tyler Prince",title:"EVP, Alliances & Channels",parentId:"4",department:"Sales"},
+    {id:"8",name:"Kieran Kennedy",title:"SVP, Americas Sales",parentId:"4",department:"Sales"},
+  ]},
+  hubspot:{company:"HubSpot",domain:"hubspot.com",sources:["hubspot.com","LinkedIn"],people:[
+    {id:"1",name:"Yamini Rangan",title:"CEO",parentId:null,department:"Executive"},
+    {id:"2",name:"Kate Bueker",title:"CFO",parentId:"1",department:"Finance"},
+    {id:"3",name:"Andy Pitre",title:"EVP, Product",parentId:"1",department:"Product"},
+    {id:"4",name:"Christian Kinnear",title:"Chief Sales Officer",parentId:"1",department:"Sales"},
+    {id:"5",name:"Kieran Flanagan",title:"EVP, Marketing",parentId:"1",department:"Marketing"},
+    {id:"6",name:"Katie Burke",title:"Chief People Officer",parentId:"1",department:"HR"},
+  ]},
+  zendesk:{company:"Zendesk",domain:"zendesk.com",sources:["zendesk.com","LinkedIn"],people:[
+    {id:"1",name:"Tom Eggemeier",title:"CEO",parentId:null,department:"Executive"},
+    {id:"2",name:"Michelle Chang",title:"CFO",parentId:"1",department:"Finance"},
+    {id:"3",name:"Shashi Upadhyay",title:"President, Product & Technology",parentId:"1",department:"Product"},
+    {id:"4",name:"Colleen Berube",title:"CIO & SVP, Operations",parentId:"1",department:"IT"},
+    {id:"5",name:"Kelly Waldher",title:"CMO",parentId:"1",department:"Marketing"},
+    {id:"6",name:"Jill Macko",title:"Chief People Officer",parentId:"1",department:"HR"},
+  ]},
+  databricks:{company:"Databricks",domain:"databricks.com",sources:["databricks.com","LinkedIn"],people:[
+    {id:"1",name:"Ali Ghodsi",title:"Co-Founder & CEO",parentId:null,department:"Executive"},
+    {id:"2",name:"Matei Zaharia",title:"Co-Founder & CTO",parentId:"1",department:"Engineering"},
+    {id:"3",name:"Naveen Rao",title:"SVP, AI",parentId:"1",department:"Product"},
+    {id:"4",name:"Chris Nicholas",title:"CFO",parentId:"1",department:"Finance"},
+    {id:"5",name:"Bryan Smith",title:"VP, Marketing",parentId:"1",department:"Marketing"},
+    {id:"6",name:"Mike Olson",title:"SVP, Alliances",parentId:"1",department:"Partnerships"},
+  ]},
 };
 </script>
 
 <script type="text/babel">
 const { useState, useEffect, useRef, useCallback } = React;
 
-// ─── Helpers ──────────────────────────────────────────────────────────────────
-const CARD_W = 190, CARD_H = 72;
+// ─── Constants ────────────────────────────────────────────────────────────────
+const CARD_W = 188, CARD_H = 72;
 const COLORS = ['#6366f1','#0ea5e9','#10b981','#f59e0b','#ec4899','#8b5cf6','#06b6d4'];
 
 function titleLevel(t='') {
-  const tl = t.toLowerCase();
-  if (/\bceo\b|chief executive|co-founder.+ceo|founder.+ceo/.test(tl)) return 0;
-  if (/\bcfo\b|\bcoo\b|\bcto\b|\bcmo\b|\bcpo\b|\bcro\b|\bclo\b|\bcio\b|\bchro\b|chief\s+\w+\s+officer|\bpresident\b/.test(tl)) return 1;
-  if (/\bevp\b|\bsvp\b|executive vice|senior vice/.test(tl)) return 2;
-  if (/\bvp\b|vice president/.test(tl)) return 3;
-  if (/\bdirector\b|\bhead of\b|\bgeneral manager\b/.test(tl)) return 4;
+  const s = t.toLowerCase();
+  if (/\bceo\b|chief executive|co-founder.+ceo/.test(s)) return 0;
+  if (/\bcfo\b|\bcoo\b|\bcto\b|\bcmo\b|\bcpo\b|\bcro\b|\bclo\b|\bcio\b|\bchro\b|chief\s+\w+\s+officer|\bpresident\b/.test(s)) return 1;
+  if (/\bevp\b|\bsvp\b/.test(s)) return 2;
+  if (/\bvp\b|vice president/.test(s)) return 3;
+  if (/director|head of/.test(s)) return 4;
   return 5;
 }
-const levelColor = lv => COLORS[Math.min(lv, COLORS.length-1)];
-const cut = (s,n) => s && s.length>n ? s.slice(0,n-1)+'…' : (s||'');
+const lc = lv => COLORS[Math.min(lv, COLORS.length-1)];
+const cut = (s,n) => s&&s.length>n ? s.slice(0,n-1)+'…' : (s||'');
+const companyKey = n => n.toLowerCase().replace(/\s*(inc|corp|llc|ltd|co\.?)\b\.?/gi,'').replace(/[^a-z0-9]/g,'');
 
-function flatToTree(data) {
+function flatToTree(people, companyName, sources) {
   const map = {};
-  data.people.forEach(p => map[p.id] = {...p, children:[]});
+  people.forEach(p => map[p.id] = {...p, children:[]});
   let root = null;
-  const ids = new Set(data.people.map(p=>p.id));
-  data.people.forEach(p => {
-    if (!p.parentId) { root = map[p.id]; }
-    else if (ids.has(p.parentId)) { map[p.parentId].children.push(map[p.id]); }
-    else if (root) { root.children.push(map[p.id]); }
+  const ids = new Set(people.map(p=>p.id));
+  people.forEach(p => {
+    if (!p.parentId) root = map[p.id];
+    else if (ids.has(p.parentId)) map[p.parentId].children.push(map[p.id]);
+    else if (root) root.children.push(map[p.id]);
   });
-  if (!root) root = map[data.people[0]?.id];
-  return { ...root, companyName:data.company, sources:data.sources||[], _totalCount:data.people.length };
+  if (!root && people.length) root = map[people[0].id];
+  return { ...root, companyName, sources: sources||[], _flat: people };
 }
 
-function companyKey(name) {
-  return name.toLowerCase().replace(/\s*(inc|corp|llc|ltd|co\.?)\b\.?/gi,'').replace(/[^a-z0-9]/g,'');
-}
-
-// ─── Anthropic API ────────────────────────────────────────────────────────────
-async function lookupCompany(companyName, apiKey) {
+// ─── Anthropic API ─────────────────────────────────────────────────────────────
+async function lookupCompany(company, apiKey) {
   const res = await fetch('https://api.anthropic.com/v1/messages', {
     method:'POST',
     headers:{
@@ -212,41 +166,27 @@ async function lookupCompany(companyName, apiKey) {
     body:JSON.stringify({
       model:'claude-opus-4-6',
       max_tokens:4096,
-      messages:[{role:'user',content:`Generate a current, accurate leadership org chart for "${companyName}".
-
-Return ONLY a valid JSON object — no markdown, no explanation, just the JSON:
-{
-  "company": "${companyName}",
-  "domain": "company.com",
-  "people": [
-    {"id":"1","name":"Full Name","title":"Job Title","parentId":null,"department":"Executive"},
-    {"id":"2","name":"Full Name","title":"Job Title","parentId":"1","department":"Finance"}
-  ]
-}
-
-Rules:
-- CEO/President at top (parentId: null), exactly one root node
-- All C-suite report directly to CEO
-- Key SVPs/VPs under their C-suite leader
-- 15–40 people total, accurate and current
-- Return ONLY the JSON object, nothing else`}]
+      messages:[{role:'user',content:`Generate a current leadership org chart for "${company}".
+Return ONLY valid JSON, no markdown:
+{"company":"${company}","domain":"company.com","people":[
+  {"id":"1","name":"Full Name","title":"Job Title","parentId":null,"department":"Executive"},
+  {"id":"2","name":"Full Name","title":"Job Title","parentId":"1","department":"Finance"}
+]}
+Rules: CEO at top (parentId null), C-suite under CEO, key VPs under C-suite, 15-40 people, accurate & current.`}]
     })
   });
-  if (!res.ok) {
-    const e = await res.json().catch(()=>({}));
-    throw new Error(e.error?.message || `API error ${res.status}`);
-  }
+  if (!res.ok) { const e=await res.json().catch(()=>({})); throw new Error(e.error?.message||`API error ${res.status}`); }
   const d = await res.json();
-  const text = d.content[0].text;
-  const match = text.match(/\{[\s\S]*\}/);
-  if (!match) throw new Error('Could not parse response');
-  const parsed = JSON.parse(match[0]);
-  return { ...parsed, sources:['Claude AI'] };
+  const m = d.content[0].text.match(/\{[\s\S]*\}/);
+  if (!m) throw new Error('Could not parse response');
+  const p = JSON.parse(m[0]);
+  return { ...p, sources:['Claude AI'] };
 }
 
-// ─── OrgChart SVG ─────────────────────────────────────────────────────────────
-function OrgChart({ data, onSelect }) {
+// ─── Draggable Org Chart ──────────────────────────────────────────────────────
+function OrgChart({ data, onSelect, onReparent }) {
   const svgRef = useRef(null);
+  const stateRef = useRef({ nodes:[], links:[], zoomTransform:d3.zoomIdentity });
 
   const draw = useCallback(() => {
     if (!svgRef.current || !data) return;
@@ -254,96 +194,206 @@ function OrgChart({ data, onSelect }) {
     svg.selectAll('*').remove();
 
     const root = d3.hierarchy(data);
-    const tree = d3.tree().nodeSize([CARD_W+28, CARD_H+52]);
+    const tree = d3.tree().nodeSize([CARD_W+30, CARD_H+54]);
     tree(root);
 
     const nodes = root.descendants(), links = root.links();
+    stateRef.current.nodes = nodes;
+
     let x0=Infinity,x1=-Infinity,y0=Infinity,y1=-Infinity;
-    nodes.forEach(n=>{
-      x0=Math.min(x0,n.x-CARD_W/2); x1=Math.max(x1,n.x+CARD_W/2);
-      y0=Math.min(y0,n.y); y1=Math.max(y1,n.y+CARD_H);
-    });
-    const tW=x1-x0+60, tH=y1-y0+60;
+    nodes.forEach(n=>{x0=Math.min(x0,n.x-CARD_W/2);x1=Math.max(x1,n.x+CARD_W/2);y0=Math.min(y0,n.y);y1=Math.max(y1,n.y+CARD_H);});
+    const tW=x1-x0+60, tH=y1-y0+70;
     const el=svgRef.current.parentElement;
     const vw=el.clientWidth||900, vh=el.clientHeight||600;
     svg.attr('width',vw).attr('height',vh);
 
+    // Defs
     const defs=svg.append('defs');
-    const f=defs.append('filter').attr('id','sh').attr('x','-20%').attr('y','-20%').attr('width','140%').attr('height','140%');
-    f.append('feDropShadow').attr('dx',0).attr('dy',2).attr('stdDeviation',3.5).attr('flood-color','rgba(0,0,0,0.07)');
+    const f=defs.append('filter').attr('id','sh').attr('x','-30%').attr('y','-30%').attr('width','160%').attr('height','160%');
+    f.append('feDropShadow').attr('dx',0).attr('dy',2).attr('stdDeviation',4).attr('flood-color','rgba(0,0,0,0.09)');
+    const fBig=defs.append('filter').attr('id','sh2').attr('x','-30%').attr('y','-30%').attr('width','160%').attr('height','160%');
+    fBig.append('feDropShadow').attr('dx',0).attr('dy',8).attr('stdDeviation',14).attr('flood-color','rgba(99,102,241,0.22)');
 
-    const g=svg.append('g');
-    const zoom=d3.zoom().scaleExtent([0.12,2.5]).on('zoom',e=>g.attr('transform',e.transform));
-    svg.call(zoom);
-    const sc=Math.min(1,(vw-60)/tW,(vh-60)/tH);
-    svg.call(zoom.transform,d3.zoomIdentity.translate(vw/2,36).scale(sc).translate(-(x0+tW/2-30),0));
+    const g = svg.append('g').attr('class','tree-root');
 
-    // Links
-    g.selectAll('.lk').data(links).join('path')
-      .attr('fill','none').attr('stroke','#dde3ed').attr('stroke-width',1.5)
-      .attr('d',lk=>{
-        const sx=lk.source.x,sy=lk.source.y+CARD_H;
-        const tx=lk.target.x,ty=lk.target.y,my=(sy+ty)/2;
-        return `M${sx},${sy} C${sx},${my} ${tx},${my} ${tx},${ty}`;
+    // Zoom
+    const zoom = d3.zoom().scaleExtent([0.1,2.5])
+      .on('zoom', e => {
+        g.attr('transform', e.transform);
+        stateRef.current.zoomTransform = e.transform;
       });
+    svg.call(zoom);
+    const sc = Math.min(1,(vw-60)/tW,(vh-60)/tH);
+    const initT = d3.zoomIdentity.translate(vw/2,40).scale(sc).translate(-(x0+tW/2-30),0);
+    svg.call(zoom.transform, initT);
+    stateRef.current.zoomTransform = initT;
 
-    // Nodes
-    const nd=g.selectAll('.nd').data(nodes).join('g')
-      .attr('transform',n=>`translate(${n.x-CARD_W/2},${n.y})`)
-      .style('cursor','pointer')
-      .on('click',(e,n)=>{e.stopPropagation();onSelect(n.data);});
-    svg.on('click',()=>onSelect(null));
+    // Link group (re-drawn on drag)
+    const linkGroup = g.append('g').attr('class','links');
+    const nodeGroup = g.append('g').attr('class','nodes');
 
-    // Card
-    nd.append('rect').attr('width',CARD_W).attr('height',CARD_H).attr('rx',9).attr('ry',9)
-      .attr('fill','white').attr('stroke',n=>levelColor(titleLevel(n.data.title)))
-      .attr('stroke-width',1.5).attr('filter','url(#sh)');
-    // Accent top
-    nd.append('rect').attr('width',CARD_W).attr('height',4).attr('rx',9).attr('fill',n=>levelColor(titleLevel(n.data.title)));
-    nd.append('rect').attr('y',2).attr('width',CARD_W).attr('height',3).attr('fill',n=>levelColor(titleLevel(n.data.title)));
+    function drawLinks(lks) {
+      linkGroup.selectAll('.lk').data(lks).join('path').attr('class','lk')
+        .attr('fill','none').attr('stroke','#dde3ed').attr('stroke-width',1.5)
+        .attr('d', lk=>{
+          const sx=lk.source.x,sy=lk.source.y+CARD_H;
+          const tx=lk.target.x,ty=lk.target.y,my=(sy+ty)/2;
+          return `M${sx},${sy} C${sx},${my} ${tx},${my} ${tx},${ty}`;
+        });
+    }
+    drawLinks(links);
+
+    // Drop target indicator
+    let dropTarget = null;
+    let dragNode = null;
+    let didDrag = false;
+
+    function isAncestorOf(potentialAncestor, node) {
+      let cur = node.parent;
+      while (cur) { if (cur === potentialAncestor) return true; cur = cur.parent; }
+      return false;
+    }
+
+    // Draw nodes
+    const nd = nodeGroup.selectAll('.nd').data(nodes).join('g')
+      .attr('class','nd')
+      .attr('transform', n=>`translate(${n.x-CARD_W/2},${n.y})`)
+      .style('cursor','grab');
+
+    // Card BG
+    nd.append('rect').attr('class','card-bg')
+      .attr('width',CARD_W).attr('height',CARD_H).attr('rx',9).attr('ry',9)
+      .attr('fill','white')
+      .attr('stroke',n=>lc(titleLevel(n.data.title))).attr('stroke-width',1.5)
+      .attr('filter','url(#sh)');
+    // Accent
+    nd.append('rect').attr('width',CARD_W).attr('height',4).attr('rx',9).attr('fill',n=>lc(titleLevel(n.data.title)));
+    nd.append('rect').attr('y',2).attr('width',CARD_W).attr('height',3).attr('fill',n=>lc(titleLevel(n.data.title)));
     // Name
     nd.append('text').attr('x',CARD_W/2).attr('y',27).attr('text-anchor','middle')
       .attr('font-size',11.5).attr('font-weight','700').attr('fill','#0f172a')
-      .attr('font-family',"'Segoe UI',-apple-system,sans-serif")
-      .text(n=>cut(n.data.name,25));
+      .attr('font-family',"-apple-system,'Segoe UI',sans-serif").text(n=>cut(n.data.name,25));
     // Title
     nd.append('text').attr('x',CARD_W/2).attr('y',46).attr('text-anchor','middle')
       .attr('font-size',10).attr('fill','#64748b')
-      .attr('font-family',"'Segoe UI',-apple-system,sans-serif")
-      .text(n=>cut(n.data.title,30));
+      .attr('font-family',"-apple-system,'Segoe UI',sans-serif").text(n=>cut(n.data.title,30));
     // Children badge
     nd.filter(n=>n.children&&n.children.length>0)
       .append('circle').attr('cx',CARD_W-11).attr('cy',CARD_H-11).attr('r',9.5)
-      .attr('fill',n=>levelColor(titleLevel(n.data.title)));
+      .attr('fill',n=>lc(titleLevel(n.data.title)));
     nd.filter(n=>n.children&&n.children.length>0)
       .append('text').attr('x',CARD_W-11).attr('y',CARD_H-11)
       .attr('text-anchor','middle').attr('dominant-baseline','middle')
       .attr('font-size',9).attr('font-weight','800').attr('fill','white')
       .text(n=>n.children.length);
-  },[data,onSelect]);
+
+    // Drag hint overlay (center of card for grab)
+    nd.append('rect').attr('class','drag-handle')
+      .attr('width',CARD_W).attr('height',CARD_H).attr('rx',9).attr('fill','transparent').attr('stroke','none');
+
+    // ── DRAG BEHAVIOR ──────────────────────────────────────────────────────────
+    const drag = d3.drag()
+      .on('start', function(event, d) {
+        if (event.sourceEvent) event.sourceEvent.stopPropagation();
+        didDrag = false;
+        dragNode = d;
+        d3.select(this).raise().style('cursor','grabbing');
+        d3.select(this).select('.card-bg').attr('filter','url(#sh2)').attr('stroke-width',2.5).attr('opacity',0.92);
+      })
+      .on('drag', function(event, d) {
+        if (Math.abs(event.dx) < 1 && Math.abs(event.dy) < 1 && !didDrag) return;
+        didDrag = true;
+        // Move dragged card with mouse (event coords are in tree space via D3)
+        d3.select(this).attr('transform', `translate(${event.x - CARD_W/2},${event.y - CARD_H/2})`);
+
+        // Find nearest valid drop target
+        let nearest = null, minDist = 90;
+        nodes.forEach(n => {
+          if (n === d || n === d.parent || isAncestorOf(d, n)) return;
+          const dist = Math.hypot(n.x - event.x, (n.y + CARD_H/2) - event.y);
+          if (dist < minDist) { minDist = dist; nearest = n; }
+        });
+
+        // Update drop target highlight
+        if (nearest !== dropTarget) {
+          if (dropTarget) {
+            nodeGroup.selectAll('.nd').filter(n=>n===dropTarget).select('.card-bg')
+              .attr('stroke',n=>lc(titleLevel(n.data.title))).attr('stroke-width',1.5).attr('stroke-dasharray',null);
+          }
+          dropTarget = nearest;
+          if (dropTarget) {
+            nodeGroup.selectAll('.nd').filter(n=>n===dropTarget).select('.card-bg')
+              .attr('stroke','#10b981').attr('stroke-width',2.5).attr('stroke-dasharray','0');
+          }
+        }
+      })
+      .on('end', function(event, d) {
+        d3.select(this).style('cursor','grab');
+        d3.select(this).select('.card-bg').attr('filter','url(#sh)').attr('stroke-width',1.5).attr('opacity',1);
+
+        // Clear drop target highlight
+        if (dropTarget) {
+          nodeGroup.selectAll('.nd').filter(n=>n===dropTarget).select('.card-bg')
+            .attr('stroke',n=>lc(titleLevel(n.data.title))).attr('stroke-width',1.5).attr('stroke-dasharray',null);
+        }
+
+        if (!didDrag) {
+          // It was a click — select contact
+          d3.select(this).attr('transform',`translate(${d.x-CARD_W/2},${d.y})`);
+          onSelect(d.data);
+          dropTarget = null;
+          dragNode = null;
+          return;
+        }
+
+        if (dropTarget && dropTarget !== d && dropTarget !== d.parent) {
+          // Valid drop — reparent
+          onReparent(d.data.id, dropTarget.data.id);
+        } else {
+          // Snap back
+          d3.select(this).transition().duration(220).ease(d3.easeCubicOut)
+            .attr('transform',`translate(${d.x-CARD_W/2},${d.y})`);
+        }
+
+        dropTarget = null;
+        dragNode = null;
+      });
+
+    nd.call(drag);
+
+    svg.on('click', () => onSelect(null));
+
+  }, [data, onSelect, onReparent]);
 
   useEffect(()=>{
     draw();
-    const ro=new ResizeObserver(draw);
-    if(svgRef.current?.parentElement) ro.observe(svgRef.current.parentElement);
+    const ro = new ResizeObserver(draw);
+    if (svgRef.current?.parentElement) ro.observe(svgRef.current.parentElement);
     return ()=>ro.disconnect();
-  },[draw]);
+  }, [draw]);
 
-  return <svg ref={svgRef} style={{display:'block',width:'100%',height:'100%'}} />;
+  return (
+    <div style={{position:'relative',width:'100%',height:'100%'}}>
+      <svg ref={svgRef} style={{display:'block',width:'100%',height:'100%'}} />
+      <div style={{
+        position:'absolute',bottom:12,left:'50%',transform:'translateX(-50%)',
+        background:'rgba(255,255,255,0.85)',backdropFilter:'blur(6px)',
+        border:'1px solid #e2e8f0',borderRadius:20,padding:'5px 14px',
+        fontSize:12,color:'#94a3b8',pointerEvents:'none',whiteSpace:'nowrap',
+        boxShadow:'0 1px 6px rgba(0,0,0,0.06)',
+      }}>
+        Drag cards to rearrange · Click to view details · Scroll to zoom
+      </div>
+    </div>
+  );
 }
 
 // ─── Contact Panel ─────────────────────────────────────────────────────────────
-function ContactPanel({contact,onClose}) {
+function ContactPanel({contact,onClose}){
   if(!contact) return null;
-  const color=levelColor(titleLevel(contact.title));
-  return (
-    <div style={{
-      position:'absolute',top:12,right:12,width:264,
-      background:'white',borderRadius:12,overflow:'hidden',
-      boxShadow:'0 8px 32px rgba(0,0,0,0.13)',
-      fontFamily:"'Segoe UI',-apple-system,sans-serif",
-      animation:'fadeIn .15s ease',
-    }}>
+  const color=lc(titleLevel(contact.title));
+  return(
+    <div style={{position:'absolute',top:12,right:12,width:264,background:'white',borderRadius:12,overflow:'hidden',boxShadow:'0 8px 32px rgba(0,0,0,0.14)',fontFamily:"-apple-system,'Segoe UI',sans-serif",animation:'fadeIn .15s ease',zIndex:10}}>
       <div style={{height:5,background:color}}/>
       <div style={{padding:'14px 16px'}}>
         <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',marginBottom:10}}>
@@ -351,15 +401,12 @@ function ContactPanel({contact,onClose}) {
             <div style={{fontWeight:700,fontSize:14,color:'#0f172a',marginBottom:2}}>{contact.name}</div>
             <div style={{fontSize:11,color:color,fontWeight:600}}>{contact.title}</div>
           </div>
-          <button onClick={onClose} style={{background:'none',border:'none',cursor:'pointer',color:'#94a3b8',fontSize:20,lineHeight:1,padding:'0 0 0 8px'}}>×</button>
+          <button onClick={onClose} style={{background:'none',border:'none',cursor:'pointer',color:'#94a3b8',fontSize:20,lineHeight:1,paddingLeft:8}}>×</button>
         </div>
         {contact.department&&<PRow k="Department" v={contact.department}/>}
         {contact.email&&<PRow k="Email" v={<a href={`mailto:${contact.email}`} style={{color:'#6366f1',textDecoration:'none'}}>{contact.email}</a>}/>}
         {contact.phone&&<PRow k="Phone" v={contact.phone}/>}
         {contact.linkedin&&<PRow k="LinkedIn" v={<a href={contact.linkedin} target="_blank" rel="noreferrer" style={{color:'#6366f1',textDecoration:'none'}}>View profile →</a>}/>}
-        {contact.source&&<div style={{marginTop:10,paddingTop:10,borderTop:'1px solid #f1f5f9'}}>
-          <span style={{fontSize:10,background:'#f1f5f9',color:'#64748b',borderRadius:4,padding:'2px 7px',fontWeight:600}}>Source: {contact.source}</span>
-        </div>}
       </div>
     </div>
   );
@@ -371,28 +418,62 @@ function PRow({k,v}){return(
   </div>
 );}
 
-// ─── API Key Modal ─────────────────────────────────────────────────────────────
-function ApiKeyModal({apiKey,onSave,onClose}){
-  const [val,setVal]=useState(apiKey||'');
+// ─── Toolbar ───────────────────────────────────────────────────────────────────
+function Toolbar({company,sources,count,canUndo,onBack,onUndo,onReset,modified}){
   return(
-    <div style={{position:'fixed',inset:0,background:'rgba(15,23,42,0.45)',display:'flex',alignItems:'center',justifyContent:'center',zIndex:200,fontFamily:"'Segoe UI',-apple-system,sans-serif"}}>
-      <div style={{background:'white',borderRadius:16,padding:28,width:430,boxShadow:'0 24px 64px rgba(0,0,0,0.18)',animation:'fadeIn .18s ease'}}>
-        <h2 style={{fontSize:18,fontWeight:800,color:'#0f172a',marginBottom:6}}>Enable Live Company Lookup</h2>
-        <p style={{fontSize:13,color:'#64748b',lineHeight:1.6,marginBottom:16}}>
-          Enter your Anthropic API key to look up any company in real time using Claude AI.
-          Get one free at{' '}<a href="https://console.anthropic.com" target="_blank" rel="noreferrer" style={{color:'#6366f1'}}>console.anthropic.com</a>.
-          <br/><strong>Your key is stored only in your browser — never sent anywhere else.</strong>
+    <div style={{height:54,background:'white',borderBottom:'1px solid #e8ecf2',display:'flex',alignItems:'center',padding:'0 16px',gap:10,flexShrink:0,fontFamily:"-apple-system,'Segoe UI',sans-serif"}}>
+      <button onClick={onBack} style={{background:'none',border:'1px solid #e2e8f0',borderRadius:8,padding:'5px 12px',fontSize:13,cursor:'pointer',color:'#475569',fontWeight:600}}>← Back</button>
+      <div style={{fontWeight:800,fontSize:16,color:'#0f172a'}}>{company}</div>
+      <div style={{fontSize:12,color:'#94a3b8'}}>{count} people</div>
+
+      {modified&&(
+        <div style={{display:'flex',gap:6,marginLeft:4}}>
+          <button onClick={onUndo} disabled={!canUndo} style={{
+            padding:'5px 12px',borderRadius:7,border:'1px solid #e2e8f0',background:'white',
+            cursor:canUndo?'pointer':'default',fontSize:12,color:canUndo?'#475569':'#cbd5e1',fontWeight:500,
+          }}>↩ Undo</button>
+          <button onClick={onReset} style={{
+            padding:'5px 12px',borderRadius:7,border:'1px solid #fca5a5',background:'#fff5f5',
+            cursor:'pointer',fontSize:12,color:'#dc2626',fontWeight:500,
+          }}>Reset</button>
+          <span style={{fontSize:11,color:'#10b981',fontWeight:600,display:'flex',alignItems:'center',gap:4}}>
+            <span style={{width:6,height:6,borderRadius:'50%',background:'#10b981',display:'inline-block'}}/>
+            Edited
+          </span>
+        </div>
+      )}
+
+      <div style={{marginLeft:'auto',display:'flex',gap:5,alignItems:'center',flexWrap:'wrap'}}>
+        <span style={{fontSize:11,color:'#94a3b8'}}>Sources:</span>
+        {(sources||[]).map(s=>(
+          <span key={s} style={{fontSize:11,background:'#eef2ff',color:'#4f46e5',borderRadius:5,padding:'2px 8px',fontWeight:600}}>{s}</span>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ─── API Key Modal ─────────────────────────────────────────────────────────────
+function ApiKeyModal({apiKey,pendingCompany,onSave,onClose}){
+  const [val,setVal]=useState(apiKey||'');
+  const go=()=>{const k=val.trim();if(k){onSave(k);onClose(k);}};
+  return(
+    <div style={{position:'fixed',inset:0,background:'rgba(15,23,42,0.5)',display:'flex',alignItems:'center',justifyContent:'center',zIndex:200,fontFamily:"-apple-system,'Segoe UI',sans-serif"}}>
+      <div style={{background:'white',borderRadius:16,padding:32,width:460,boxShadow:'0 24px 64px rgba(0,0,0,0.18)',animation:'fadeIn .18s ease'}}>
+        <div style={{fontSize:36,marginBottom:12}}>🔑</div>
+        <h2 style={{fontSize:20,fontWeight:800,color:'#0f172a',marginBottom:8}}>{pendingCompany?`Look up ${pendingCompany}`:'Enable any-company lookup'}</h2>
+        <p style={{fontSize:13,color:'#64748b',lineHeight:1.65,marginBottom:20}}>
+          Paste your Anthropic API key to search any company in real time — <strong>one-time setup</strong>, stored only in your browser.<br/><br/>
+          Get a free key at{' '}
+          <a href="https://console.anthropic.com/settings/keys" target="_blank" rel="noreferrer" style={{color:'#6366f1',fontWeight:600}}>console.anthropic.com → API Keys</a>
         </p>
-        <input
-          value={val} onChange={e=>setVal(e.target.value)}
-          placeholder="sk-ant-api03-..."
-          style={{width:'100%',padding:'10px 14px',borderRadius:8,border:'1.5px solid #e2e8f0',fontSize:13,marginBottom:16,outline:'none',fontFamily:'monospace',letterSpacing:'0.03em'}}
-        />
+        <input value={val} onChange={e=>setVal(e.target.value)} onKeyDown={e=>e.key==='Enter'&&go()}
+          placeholder="sk-ant-api03-..." autoFocus
+          style={{width:'100%',padding:'12px 14px',borderRadius:8,border:'1.5px solid #e2e8f0',fontSize:13,marginBottom:16,fontFamily:'monospace'}}/>
         <div style={{display:'flex',gap:8,justifyContent:'flex-end'}}>
-          <button onClick={onClose} style={{padding:'9px 18px',borderRadius:8,border:'1px solid #e2e8f0',background:'white',cursor:'pointer',fontSize:13,color:'#475569'}}>Cancel</button>
-          <button onClick={()=>{onSave(val.trim());onClose();}}
-            style={{padding:'9px 18px',borderRadius:8,border:'none',background:'linear-gradient(135deg,#6366f1,#8b5cf6)',color:'white',cursor:'pointer',fontSize:13,fontWeight:700}}>
-            Save Key
+          <button onClick={()=>onClose(null)} style={{padding:'10px 18px',borderRadius:8,border:'1px solid #e2e8f0',background:'white',cursor:'pointer',fontSize:13,color:'#475569'}}>Cancel</button>
+          <button onClick={go} disabled={!val.trim()} style={{padding:'10px 22px',borderRadius:8,border:'none',background:'linear-gradient(135deg,#6366f1,#8b5cf6)',color:'white',cursor:'pointer',fontSize:14,fontWeight:700,opacity:val.trim()?1:0.5}}>
+            {pendingCompany?`Search ${pendingCompany} →`:'Save & Enable'}
           </button>
         </div>
       </div>
@@ -402,20 +483,13 @@ function ApiKeyModal({apiKey,onSave,onClose}){
 
 // ─── Search Screen ─────────────────────────────────────────────────────────────
 const CHIPS = ['Nike','Workday','Salesforce','ServiceNow','Snowflake','HubSpot','Zendesk','Databricks'];
-
 function SearchScreen({onSearch,apiKey,onSettings}){
   const [val,setVal]=useState('');
   const go=e=>{e.preventDefault();if(val.trim())onSearch(val.trim());};
   return(
-    <div style={{display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',height:'100%',background:'#f8fafc',padding:24}}>
-      {/* Logo */}
-      <div style={{marginBottom:44,textAlign:'center'}}>
-        <div style={{
-          width:62,height:62,borderRadius:17,
-          background:'linear-gradient(135deg,#6366f1,#8b5cf6)',
-          display:'flex',alignItems:'center',justifyContent:'center',
-          margin:'0 auto 16px',boxShadow:'0 6px 24px rgba(99,102,241,0.32)',
-        }}>
+    <div style={{display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',height:'100%',background:'#f8fafc',padding:24,fontFamily:"-apple-system,'Segoe UI',sans-serif"}}>
+      <div style={{marginBottom:40,textAlign:'center'}}>
+        <div style={{width:62,height:62,borderRadius:17,background:'linear-gradient(135deg,#6366f1,#8b5cf6)',display:'flex',alignItems:'center',justifyContent:'center',margin:'0 auto 16px',boxShadow:'0 6px 24px rgba(99,102,241,0.32)'}}>
           <svg width="30" height="30" viewBox="0 0 24 24" fill="none">
             <circle cx="12" cy="3.5" r="2.6" fill="white"/>
             <circle cx="4" cy="17" r="2.6" fill="white"/>
@@ -428,42 +502,37 @@ function SearchScreen({onSearch,apiKey,onSettings}){
         <p style={{color:'#64748b',fontSize:15}}>Visual leadership intelligence for every account</p>
       </div>
 
-      {/* Search */}
       <form onSubmit={go} style={{width:'100%',maxWidth:520}}>
         <div style={{display:'flex',gap:8,boxShadow:'0 2px 16px rgba(0,0,0,0.07)',borderRadius:14}}>
-          <input
-            value={val} onChange={e=>setVal(e.target.value)}
-            placeholder="Type any company name..."
-            autoFocus
-            style={{flex:1,padding:'15px 20px',borderRadius:'14px 0 0 14px',fontSize:15,border:'1.5px solid #e2e8f0',borderRight:'none',outline:'none',background:'white',color:'#0f172a'}}
-          />
-          <button type="submit" disabled={!val.trim()} style={{
-            padding:'15px 26px',borderRadius:'0 14px 14px 0',fontSize:15,fontWeight:700,
-            background:'linear-gradient(135deg,#6366f1,#8b5cf6)',color:'white',
-            border:'1.5px solid transparent',cursor:'pointer',whiteSpace:'nowrap',
-          }}>Search →</button>
+          <input value={val} onChange={e=>setVal(e.target.value)} placeholder="Type any company name..." autoFocus
+            style={{flex:1,padding:'15px 20px',borderRadius:'14px 0 0 14px',fontSize:15,border:'1.5px solid #e2e8f0',borderRight:'none',background:'white',color:'#0f172a'}}/>
+          <button type="submit" disabled={!val.trim()} style={{padding:'15px 26px',borderRadius:'0 14px 14px 0',fontSize:15,fontWeight:700,background:'linear-gradient(135deg,#6366f1,#8b5cf6)',color:'white',border:'none',cursor:'pointer',whiteSpace:'nowrap'}}>
+            Search →
+          </button>
         </div>
       </form>
 
-      {/* Chips */}
-      <div style={{marginTop:18,display:'flex',gap:7,flexWrap:'wrap',justifyContent:'center',maxWidth:520}}>
+      <div style={{marginTop:14,display:'flex',gap:7,flexWrap:'wrap',justifyContent:'center',maxWidth:520}}>
         {CHIPS.map(co=>(
-          <button key={co} onClick={()=>onSearch(co)} style={{
-            padding:'6px 15px',borderRadius:20,fontSize:13,
-            background:'white',border:'1.5px solid #e2e8f0',color:'#475569',
-            cursor:'pointer',fontWeight:500,
-          }}>{co}</button>
+          <button key={co} onClick={()=>onSearch(co)} style={{padding:'6px 15px',borderRadius:20,fontSize:13,background:'white',border:'1.5px solid #e2e8f0',color:'#475569',cursor:'pointer',fontWeight:500}}>{co}</button>
         ))}
       </div>
 
-      {/* API status */}
-      <div style={{marginTop:28,display:'flex',alignItems:'center',gap:8,fontSize:12,color:'#94a3b8'}}>
-        <span style={{width:8,height:8,borderRadius:'50%',background:apiKey?'#10b981':'#cbd5e1',display:'inline-block'}}/>
-        {apiKey ? 'Live lookup active — any company works' : 'Pre-loaded: 8 companies'}
-        <button onClick={onSettings} style={{color:'#6366f1',background:'none',border:'none',cursor:'pointer',fontSize:12,fontWeight:600,textDecoration:'underline'}}>
-          {apiKey?'Change':'Enable live lookup →'}
-        </button>
-      </div>
+      {!apiKey?(
+        <div style={{marginTop:24,background:'#eef2ff',border:'1.5px solid #c7d2fe',borderRadius:12,padding:'14px 20px',maxWidth:520,width:'100%',display:'flex',alignItems:'center',justifyContent:'space-between',gap:12}}>
+          <div>
+            <div style={{fontSize:13,fontWeight:700,color:'#3730a3',marginBottom:2}}>Want to search any company?</div>
+            <div style={{fontSize:12,color:'#4f46e5'}}>Add your Anthropic API key — one-time setup, then every account works.</div>
+          </div>
+          <button onClick={onSettings} style={{padding:'9px 16px',borderRadius:8,border:'none',background:'linear-gradient(135deg,#6366f1,#8b5cf6)',color:'white',cursor:'pointer',fontSize:13,fontWeight:700,whiteSpace:'nowrap',flexShrink:0}}>Set up →</button>
+        </div>
+      ):(
+        <div style={{marginTop:20,display:'flex',alignItems:'center',gap:8,fontSize:12,color:'#94a3b8'}}>
+          <span style={{width:8,height:8,borderRadius:'50%',background:'#10b981',display:'inline-block'}}/>
+          Live lookup active — any company works
+          <button onClick={onSettings} style={{color:'#6366f1',background:'none',border:'none',cursor:'pointer',fontSize:12,fontWeight:600,textDecoration:'underline'}}>Change key</button>
+        </div>
+      )}
     </div>
   );
 }
@@ -473,30 +542,13 @@ function LoadingScreen({company}){
   const [d,setD]=useState('');
   useEffect(()=>{const iv=setInterval(()=>setD(x=>x.length>=3?'':x+'.'),380);return()=>clearInterval(iv);},[]);
   return(
-    <div style={{display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',height:'100%',background:'#f8fafc',gap:16}}>
+    <div style={{display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',height:'100%',background:'#f8fafc',gap:16,fontFamily:"-apple-system,'Segoe UI',sans-serif"}}>
       <svg width="48" height="48" viewBox="0 0 48 48" style={{animation:'spin 0.9s linear infinite'}}>
         <circle cx="24" cy="24" r="20" fill="none" stroke="#e2e8f0" strokeWidth="4"/>
         <path d="M24 4 A20 20 0 0 1 44 24" fill="none" stroke="#6366f1" strokeWidth="4" strokeLinecap="round"/>
       </svg>
       <div style={{fontWeight:700,fontSize:19,color:'#0f172a'}}>Building org chart for {company}{d}</div>
-      <div style={{fontSize:13,color:'#94a3b8'}}>Querying leadership data via Claude AI</div>
-    </div>
-  );
-}
-
-// ─── Chart Header ──────────────────────────────────────────────────────────────
-function Header({company,sources,count,onBack}){
-  return(
-    <div style={{height:54,background:'white',borderBottom:'1px solid #e8ecf2',display:'flex',alignItems:'center',padding:'0 18px',gap:12,flexShrink:0}}>
-      <button onClick={onBack} style={{background:'none',border:'1px solid #e2e8f0',borderRadius:8,padding:'5px 12px',fontSize:13,cursor:'pointer',color:'#475569',fontWeight:600}}>← Back</button>
-      <div style={{fontWeight:800,fontSize:16,color:'#0f172a'}}>{company}</div>
-      <div style={{fontSize:12,color:'#94a3b8',fontWeight:500}}>{count} people</div>
-      <div style={{marginLeft:'auto',display:'flex',gap:5,alignItems:'center',flexWrap:'wrap'}}>
-        <span style={{fontSize:11,color:'#94a3b8'}}>Sources:</span>
-        {(sources||[]).map(s=>(
-          <span key={s} style={{fontSize:11,background:'#eef2ff',color:'#4f46e5',borderRadius:5,padding:'2px 8px',fontWeight:600}}>{s}</span>
-        ))}
-      </div>
+      <div style={{fontSize:13,color:'#94a3b8'}}>Querying leadership data</div>
     </div>
   );
 }
@@ -505,57 +557,80 @@ function Header({company,sources,count,onBack}){
 function App(){
   const [screen,setScreen]=useState('search');
   const [query,setQuery]=useState('');
-  const [tree,setTree]=useState(null);
-  const [error,setError]=useState('');
+  const [companyMeta,setCompanyMeta]=useState(null); // {name, sources, originalPeople}
+  const [people,setPeople]=useState([]);             // editable flat list
+  const [history,setHistory]=useState([]);            // undo stack
   const [selected,setSelected]=useState(null);
   const [showSettings,setShowSettings]=useState(false);
-  const [apiKey,setApiKey]=useState(()=>{ try{return localStorage.getItem('oc_api_key')||'';}catch{return '';} });
+  const [pendingCompany,setPendingCompany]=useState(null);
+  const [error,setError]=useState('');
+  const [apiKey,setApiKey]=useState(()=>{try{return localStorage.getItem('oc_api_key')||'';}catch{return '';}});
 
-  const saveKey=k=>{
-    setApiKey(k);
-    try{ k?localStorage.setItem('oc_api_key',k):localStorage.removeItem('oc_api_key'); }catch{}
+  const saveKey=k=>{setApiKey(k);try{k?localStorage.setItem('oc_api_key',k):localStorage.removeItem('oc_api_key');}catch{}};
+
+  const loadCompany=(data)=>{
+    setCompanyMeta({name:data.company,sources:data.sources||[],originalPeople:[...data.people]});
+    setPeople([...data.people]);
+    setHistory([]);
+    setScreen('chart');
   };
 
-  const handleSearch=async company=>{
+  const runSearch=async(company,key)=>{
     setQuery(company); setSelected(null); setError('');
-    const key=companyKey(company);
-    if(COMPANIES[key]){
-      setTree(flatToTree(COMPANIES[key]));
-      setScreen('chart');
-      return;
-    }
-    if(apiKey){
-      setScreen('loading');
-      try{
-        const data=await lookupCompany(company,apiKey);
-        setTree(flatToTree(data));
-        setScreen('chart');
-      }catch(e){
-        setError(e.message);
-        setScreen('error');
-      }
-    } else {
-      setError(`"${company}" isn't in the pre-loaded list. Enable live lookup to search any company instantly.`);
-      setScreen('error');
-    }
+    const ck=companyKey(company);
+    if(COMPANIES[ck]){loadCompany(COMPANIES[ck]);return;}
+    setScreen('loading');
+    try{const d=await lookupCompany(company,key);loadCompany(d);}
+    catch(e){setError(e.message);setScreen('error');}
   };
 
-  function countAll(n){ if(!n)return 0; return 1+(n.children||[]).reduce((s,c)=>s+countAll(c),0); }
+  const handleSearch=company=>{
+    const ck=companyKey(company);
+    if(COMPANIES[ck]){runSearch(company,apiKey);return;}
+    if(apiKey){runSearch(company,apiKey);return;}
+    setPendingCompany(company);setShowSettings(true);
+  };
+
+  // Drag reparent
+  const handleReparent=useCallback((childId,newParentId)=>{
+    setPeople(prev=>{
+      const next=prev.map(p=>p.id===childId?{...p,parentId:newParentId}:p);
+      setHistory(h=>[...h,prev]);
+      return next;
+    });
+    setSelected(null);
+  },[]);
+
+  const handleUndo=()=>{
+    if(!history.length)return;
+    const prev=history[history.length-1];
+    setPeople(prev);
+    setHistory(h=>h.slice(0,-1));
+  };
+
+  const handleReset=()=>{
+    if(!companyMeta)return;
+    setPeople([...companyMeta.originalPeople]);
+    setHistory([]);
+  };
+
+  const tree = companyMeta ? flatToTree(people, companyMeta.name, companyMeta.sources) : null;
+  function countAll(n){if(!n)return 0;return 1+(n.children||[]).reduce((s,c)=>s+countAll(c),0);}
 
   return(
     <div style={{height:'100vh',display:'flex',flexDirection:'column',overflow:'hidden'}}>
-      {showSettings&&<ApiKeyModal apiKey={apiKey} onSave={saveKey} onClose={()=>setShowSettings(false)}/>}
+      {showSettings&&<ApiKeyModal apiKey={apiKey} pendingCompany={pendingCompany} onSave={saveKey}
+        onClose={k=>{setShowSettings(false);setPendingCompany(null);if(k&&pendingCompany)runSearch(pendingCompany,k);}}/>}
 
       {screen==='search'&&<SearchScreen onSearch={handleSearch} apiKey={apiKey} onSettings={()=>setShowSettings(true)}/>}
-
       {screen==='loading'&&<LoadingScreen company={query}/>}
 
       {screen==='error'&&(
-        <div style={{display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',height:'100%',gap:14,fontFamily:"'Segoe UI',-apple-system,sans-serif"}}>
+        <div style={{display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',height:'100%',gap:14,fontFamily:"-apple-system,'Segoe UI',sans-serif"}}>
           <div style={{fontSize:44}}>😕</div>
           <div style={{fontWeight:800,fontSize:19,color:'#0f172a'}}>Company not found</div>
           <div style={{color:'#64748b',fontSize:14,maxWidth:400,textAlign:'center',lineHeight:1.6}}>{error}</div>
-          <div style={{display:'flex',gap:8,marginTop:4}}>
+          <div style={{display:'flex',gap:8}}>
             <button onClick={()=>setScreen('search')} style={{padding:'10px 22px',borderRadius:10,fontSize:14,fontWeight:700,background:'linear-gradient(135deg,#6366f1,#8b5cf6)',color:'white',border:'none',cursor:'pointer'}}>Try another</button>
             {!apiKey&&<button onClick={()=>{setScreen('search');setShowSettings(true);}} style={{padding:'10px 22px',borderRadius:10,fontSize:14,fontWeight:700,background:'white',color:'#6366f1',border:'2px solid #6366f1',cursor:'pointer'}}>Enable live lookup</button>}
           </div>
@@ -564,9 +639,14 @@ function App(){
 
       {screen==='chart'&&tree&&(
         <>
-          <Header company={tree.companyName} sources={tree.sources} count={countAll(tree)} onBack={()=>{setScreen('search');setSelected(null);}}/>
+          <Toolbar
+            company={companyMeta.name} sources={companyMeta.sources} count={countAll(tree)}
+            canUndo={history.length>0} modified={history.length>0}
+            onBack={()=>{setScreen('search');setSelected(null);}}
+            onUndo={handleUndo} onReset={handleReset}
+          />
           <div style={{flex:1,overflow:'hidden',position:'relative',background:'#f8fafc'}}>
-            <OrgChart data={tree} onSelect={setSelected}/>
+            <OrgChart data={tree} onSelect={setSelected} onReparent={handleReparent}/>
             <ContactPanel contact={selected} onClose={()=>setSelected(null)}/>
           </div>
         </>
