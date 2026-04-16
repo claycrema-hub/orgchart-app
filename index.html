@@ -12,17 +12,33 @@
   *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
   html,body{height:100%;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:#f8fafc;color:#0f172a}
   #root{height:100%}
-  input:focus{border-color:#6366f1!important;box-shadow:0 0 0 3px rgba(99,102,241,0.12)!important;outline:none}
+  input:focus,select:focus,textarea:focus{border-color:#6366f1!important;box-shadow:0 0 0 3px rgba(99,102,241,0.12)!important;outline:none}
+  button:active{transform:scale(0.97)}
   @keyframes spin{to{transform:rotate(360deg)}}
   @keyframes fadeIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
-  .drag-hint{font-size:12px;color:#94a3b8;text-align:center;padding:6px;pointer-events:none}
+  @keyframes pulse{0%,100%{opacity:1}50%{opacity:.5}}
+  @keyframes slideIn{from{transform:translateX(-100%);opacity:0}to{transform:translateX(0);opacity:1}}
+  .zoom-btn{width:36px;height:36px;border-radius:10px;border:1px solid #e2e8f0;background:white;cursor:pointer;font-size:18px;display:flex;align-items:center;justify-content:center;color:#475569;box-shadow:0 2px 8px rgba(0,0,0,0.06);transition:background .15s}
+  .zoom-btn:hover{background:#f1f5f9}
+  .modal-overlay{position:fixed;inset:0;background:rgba(15,23,42,0.5);display:flex;align-items:center;justify-content:center;z-index:200;font-family:-apple-system,'Segoe UI',sans-serif}
+  .modal-box{background:white;border-radius:16px;padding:28px 32px;max-width:95vw;box-shadow:0 24px 64px rgba(0,0,0,0.18);animation:fadeIn .18s ease}
+  .field-label{display:block;font-size:11px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px}
+  .field-input{width:100%;padding:10px 12px;border-radius:8px;border:1.5px solid #e2e8f0;font-size:13px;margin-bottom:12px;font-family:inherit}
+  .btn-primary{padding:10px 22px;border-radius:8px;border:none;background:linear-gradient(135deg,#6366f1,#8b5cf6);color:white;cursor:pointer;font-size:14px;font-weight:700}
+  .btn-secondary{padding:10px 18px;border-radius:8px;border:1px solid #e2e8f0;background:white;cursor:pointer;font-size:13px;color:#475569}
+  .btn-danger{padding:8px 16px;border-radius:8px;border:1px solid #fca5a5;background:#fff5f5;cursor:pointer;font-size:12px;color:#dc2626;font-weight:600}
+  .toolbar-btn{padding:6px 14px;border-radius:8px;border:1px solid #e2e8f0;background:white;cursor:pointer;font-size:12px;color:#475569;font-weight:600;display:flex;align-items:center;gap:5px;white-space:nowrap;transition:background .15s}
+  .toolbar-btn:hover{background:#f1f5f9}
+  .finder-card{background:white;border:1.5px solid #e2e8f0;border-radius:10px;padding:10px 12px;margin-bottom:8px;cursor:default;transition:border-color .15s,box-shadow .15s}
+  .finder-card:hover{border-color:#c7d2fe;box-shadow:0 2px 8px rgba(99,102,241,0.1)}
+  .finder-add-btn{padding:4px 10px;border-radius:6px;border:1.5px solid #c7d2fe;background:#eef2ff;color:#6366f1;font-size:11px;font-weight:700;cursor:pointer;transition:background .15s}
+  .finder-add-btn:hover{background:#ddd6fe}
 </style>
 </head>
 <body>
 <div id="root"></div>
 
 <script>
-// ─── Pre-loaded Company Data ──────────────────────────────────────────────────
 const COMPANIES = {
   workday:{company:"Workday",domain:"workday.com",sources:["workday.com","LinkedIn","Clay"],people:[
     {id:"1",name:"Aneel Bhusri",title:"Co-CEO & Co-Founder",parentId:null,department:"Executive"},
@@ -122,10 +138,9 @@ const COMPANIES = {
 <script type="text/babel">
 const { useState, useEffect, useRef, useCallback } = React;
 
-// ─── Constants ────────────────────────────────────────────────────────────────
-const CARD_W = 188, CARD_H = 72;
-const COLORS = ['#6366f1','#0ea5e9','#10b981','#f59e0b','#ec4899','#8b5cf6','#06b6d4'];
-
+const CARD_W = 200, CARD_H = 82;
+const DEPT_COLORS = {Executive:'#6366f1',Finance:'#0ea5e9',Product:'#8b5cf6',Engineering:'#06b6d4',Sales:'#10b981',Marketing:'#f59e0b',HR:'#ec4899',Legal:'#64748b',Operations:'#f97316',IT:'#14b8a6',Customer:'#a855f7',Brand:'#e11d48',Comms:'#84cc16',DEI:'#d946ef',Partnerships:'#0d9488'};
+const deptColor = d => DEPT_COLORS[d] || '#6366f1';
 function titleLevel(t='') {
   const s = t.toLowerCase();
   if (/\bceo\b|chief executive|co-founder.+ceo/.test(s)) return 0;
@@ -135,9 +150,24 @@ function titleLevel(t='') {
   if (/director|head of/.test(s)) return 4;
   return 5;
 }
-const lc = lv => COLORS[Math.min(lv, COLORS.length-1)];
-const cut = (s,n) => s&&s.length>n ? s.slice(0,n-1)+'…' : (s||'');
+function guessDept(title='') {
+  const t = title.toLowerCase();
+  if (/sales|revenue|account|commercial|go.to.market/i.test(t)) return 'Sales';
+  if (/market|brand|comm/i.test(t)) return 'Marketing';
+  if (/engineer|tech|platform|architect|data/i.test(t)) return 'Engineering';
+  if (/product/i.test(t)) return 'Product';
+  if (/financ|cfo|controller|treasury/i.test(t)) return 'Finance';
+  if (/legal|counsel|compliance/i.test(t)) return 'Legal';
+  if (/people|human|talent|hr|recruiting/i.test(t)) return 'HR';
+  if (/operation|coo/i.test(t)) return 'Operations';
+  if (/customer|success|support/i.test(t)) return 'Customer';
+  if (/security|info|cio|ciso/i.test(t)) return 'IT';
+  if (/ceo|chief exec|co-founder/i.test(t)) return 'Executive';
+  return 'Executive';
+}
+const cut = (s,n) => s&&s.length>n ? s.slice(0,n-1)+'...' : (s||'');
 const companyKey = n => n.toLowerCase().replace(/\s*(inc|corp|llc|ltd|co\.?)\b\.?/gi,'').replace(/[^a-z0-9]/g,'');
+const nextId = (people) => String(Math.max(0,...people.map(p=>parseInt(p.id)||0))+1);
 
 function flatToTree(people, companyName, sources) {
   const map = {};
@@ -153,53 +183,67 @@ function flatToTree(people, companyName, sources) {
   return { ...root, companyName, sources: sources||[], _flat: people };
 }
 
-// ─── Anthropic API ─────────────────────────────────────────────────────────────
+// Anthropic API - initial lookup
 async function lookupCompany(company, apiKey) {
   const res = await fetch('https://api.anthropic.com/v1/messages', {
     method:'POST',
-    headers:{
-      'Content-Type':'application/json',
-      'x-api-key':apiKey,
-      'anthropic-version':'2023-06-01',
-      'anthropic-dangerous-direct-browser-access':'true',
-    },
+    headers:{'Content-Type':'application/json','x-api-key':apiKey,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},
     body:JSON.stringify({
-      model:'claude-opus-4-6',
-      max_tokens:4096,
+      model:'claude-sonnet-4-6', max_tokens:4096,
       messages:[{role:'user',content:`Generate a current leadership org chart for "${company}".
 Return ONLY valid JSON, no markdown:
 {"company":"${company}","domain":"company.com","people":[
   {"id":"1","name":"Full Name","title":"Job Title","parentId":null,"department":"Executive"},
   {"id":"2","name":"Full Name","title":"Job Title","parentId":"1","department":"Finance"}
 ]}
-Rules: CEO at top (parentId null), C-suite under CEO, key VPs under C-suite, 15-40 people, accurate & current.`}]
+Rules: CEO at top (parentId null). C-suite reports to CEO. Key VPs under C-suite. 15-40 people. Use accurate current data. Department should be one of: Executive, Finance, Product, Engineering, Sales, Marketing, HR, Legal, Operations, IT, Customer.`}]
     })
   });
   if (!res.ok) { const e=await res.json().catch(()=>({})); throw new Error(e.error?.message||`API error ${res.status}`); }
   const d = await res.json();
   const m = d.content[0].text.match(/\{[\s\S]*\}/);
   if (!m) throw new Error('Could not parse response');
-  const p = JSON.parse(m[0]);
-  return { ...p, sources:['Claude AI'] };
+  return { ...JSON.parse(m[0]), sources:['Claude AI'] };
 }
 
-// ─── Draggable Org Chart ──────────────────────────────────────────────────────
-function OrgChart({ data, onSelect, onReparent }) {
+// Anthropic API - search for people at a company (People Finder)
+async function searchPeople(company, role, apiKey) {
+  const roleClause = role ? `Focus on people with "${role}" in their title or in the ${role} department.` : 'Include a broad mix of C-suite, VPs, SVPs, and Directors across all departments.';
+  const res = await fetch('https://api.anthropic.com/v1/messages', {
+    method:'POST',
+    headers:{'Content-Type':'application/json','x-api-key':apiKey,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},
+    body:JSON.stringify({
+      model:'claude-sonnet-4-6', max_tokens:4096,
+      messages:[{role:'user',content:`List real current leaders at "${company}". ${roleClause}
+Return ONLY a valid JSON array, no markdown, no explanation:
+[{"name":"Full Name","title":"Job Title","department":"Dept"}, ...]
+Rules:
+- 10-20 people, real and current
+- Department: one of Executive, Finance, Product, Engineering, Sales, Marketing, HR, Legal, Operations, IT, Customer
+- Include name, title, department only
+- Be accurate — only include people you're confident actually work there now`}]
+    })
+  });
+  if (!res.ok) { const e=await res.json().catch(()=>({})); throw new Error(e.error?.message||`API error ${res.status}`); }
+  const d = await res.json();
+  const m = d.content[0].text.match(/\[[\s\S]*\]/);
+  if (!m) throw new Error('Could not parse response');
+  return JSON.parse(m[0]);
+}
+
+// ─── Draggable Org Chart ──────────────────────────────────────────────────
+function OrgChart({ data, onSelect, onReparent, zoomRef }) {
   const svgRef = useRef(null);
-  const stateRef = useRef({ nodes:[], links:[], zoomTransform:d3.zoomIdentity });
+  const stateRef = useRef({ zoomBehavior:null, zoomTransform:d3.zoomIdentity });
 
   const draw = useCallback(() => {
     if (!svgRef.current || !data) return;
     const svg = d3.select(svgRef.current);
     svg.selectAll('*').remove();
-
     const root = d3.hierarchy(data);
-    const tree = d3.tree().nodeSize([CARD_W+30, CARD_H+54]);
+    const tree = d3.tree().nodeSize([CARD_W+32, CARD_H+56]);
     tree(root);
-
     const nodes = root.descendants(), links = root.links();
-    stateRef.current.nodes = nodes;
-
     let x0=Infinity,x1=-Infinity,y0=Infinity,y1=-Infinity;
     nodes.forEach(n=>{x0=Math.min(x0,n.x-CARD_W/2);x1=Math.max(x1,n.x+CARD_W/2);y0=Math.min(y0,n.y);y1=Math.max(y1,n.y+CARD_H);});
     const tW=x1-x0+60, tH=y1-y0+70;
@@ -207,281 +251,333 @@ function OrgChart({ data, onSelect, onReparent }) {
     const vw=el.clientWidth||900, vh=el.clientHeight||600;
     svg.attr('width',vw).attr('height',vh);
 
-    // Defs
     const defs=svg.append('defs');
     const f=defs.append('filter').attr('id','sh').attr('x','-30%').attr('y','-30%').attr('width','160%').attr('height','160%');
-    f.append('feDropShadow').attr('dx',0).attr('dy',2).attr('stdDeviation',4).attr('flood-color','rgba(0,0,0,0.09)');
+    f.append('feDropShadow').attr('dx',0).attr('dy',2).attr('stdDeviation',4).attr('flood-color','rgba(0,0,0,0.08)');
     const fBig=defs.append('filter').attr('id','sh2').attr('x','-30%').attr('y','-30%').attr('width','160%').attr('height','160%');
     fBig.append('feDropShadow').attr('dx',0).attr('dy',8).attr('stdDeviation',14).attr('flood-color','rgba(99,102,241,0.22)');
 
     const g = svg.append('g').attr('class','tree-root');
-
-    // Zoom
-    const zoom = d3.zoom().scaleExtent([0.1,2.5])
-      .on('zoom', e => {
-        g.attr('transform', e.transform);
-        stateRef.current.zoomTransform = e.transform;
-      });
+    const zoom = d3.zoom().scaleExtent([0.08,3])
+      .on('zoom', e => { g.attr('transform', e.transform); stateRef.current.zoomTransform = e.transform; });
     svg.call(zoom);
+    stateRef.current.zoomBehavior = zoom;
     const sc = Math.min(1,(vw-60)/tW,(vh-60)/tH);
     const initT = d3.zoomIdentity.translate(vw/2,40).scale(sc).translate(-(x0+tW/2-30),0);
     svg.call(zoom.transform, initT);
-    stateRef.current.zoomTransform = initT;
-
-    // Link group (re-drawn on drag)
-    const linkGroup = g.append('g').attr('class','links');
-    const nodeGroup = g.append('g').attr('class','nodes');
-
-    function drawLinks(lks) {
-      linkGroup.selectAll('.lk').data(lks).join('path').attr('class','lk')
-        .attr('fill','none').attr('stroke','#dde3ed').attr('stroke-width',1.5)
-        .attr('d', lk=>{
-          const sx=lk.source.x,sy=lk.source.y+CARD_H;
-          const tx=lk.target.x,ty=lk.target.y,my=(sy+ty)/2;
-          return `M${sx},${sy} C${sx},${my} ${tx},${my} ${tx},${ty}`;
-        });
-    }
-    drawLinks(links);
-
-    // Drop target indicator
-    let dropTarget = null;
-    let dragNode = null;
-    let didDrag = false;
-
-    function isAncestorOf(potentialAncestor, node) {
-      let cur = node.parent;
-      while (cur) { if (cur === potentialAncestor) return true; cur = cur.parent; }
-      return false;
+    if (zoomRef) {
+      zoomRef.current = {
+        zoomIn: () => svg.transition().duration(300).call(zoom.scaleBy, 1.4),
+        zoomOut: () => svg.transition().duration(300).call(zoom.scaleBy, 0.7),
+        fitView: () => { const sc2=Math.min(1,(vw-60)/tW,(vh-60)/tH); const t=d3.zoomIdentity.translate(vw/2,40).scale(sc2).translate(-(x0+tW/2-30),0); svg.transition().duration(400).call(zoom.transform,t); }
+      };
     }
 
-    // Draw nodes
+    const linkGroup = g.append('g');
+    const nodeGroup = g.append('g');
+    linkGroup.selectAll('.lk').data(links).join('path').attr('class','lk')
+      .attr('fill','none').attr('stroke','#dde3ed').attr('stroke-width',1.5)
+      .attr('d', lk=>{ const sx=lk.source.x,sy=lk.source.y+CARD_H,tx=lk.target.x,ty=lk.target.y,my=(sy+ty)/2; return `M${sx},${sy} C${sx},${my} ${tx},${my} ${tx},${ty}`; });
+
+    let dropTarget=null, dragNode=null, didDrag=false;
+    function isAncestorOf(a,n){let c=n.parent;while(c){if(c===a)return true;c=c.parent;}return false;}
+
     const nd = nodeGroup.selectAll('.nd').data(nodes).join('g')
-      .attr('class','nd')
-      .attr('transform', n=>`translate(${n.x-CARD_W/2},${n.y})`)
-      .style('cursor','grab');
-
-    // Card BG
-    nd.append('rect').attr('class','card-bg')
-      .attr('width',CARD_W).attr('height',CARD_H).attr('rx',9).attr('ry',9)
-      .attr('fill','white')
-      .attr('stroke',n=>lc(titleLevel(n.data.title))).attr('stroke-width',1.5)
-      .attr('filter','url(#sh)');
-    // Accent
-    nd.append('rect').attr('width',CARD_W).attr('height',4).attr('rx',9).attr('fill',n=>lc(titleLevel(n.data.title)));
-    nd.append('rect').attr('y',2).attr('width',CARD_W).attr('height',3).attr('fill',n=>lc(titleLevel(n.data.title)));
-    // Name
-    nd.append('text').attr('x',CARD_W/2).attr('y',27).attr('text-anchor','middle')
-      .attr('font-size',11.5).attr('font-weight','700').attr('fill','#0f172a')
-      .attr('font-family',"-apple-system,'Segoe UI',sans-serif").text(n=>cut(n.data.name,25));
-    // Title
+      .attr('class','nd').attr('transform',n=>`translate(${n.x-CARD_W/2},${n.y})`).style('cursor','grab');
+    nd.append('rect').attr('class','card-bg').attr('width',CARD_W).attr('height',CARD_H).attr('rx',10).attr('ry',10)
+      .attr('fill','white').attr('stroke','#e2e8f0').attr('stroke-width',1.5).attr('filter','url(#sh)');
+    nd.append('rect').attr('width',CARD_W).attr('height',4).attr('rx',10).attr('fill',n=>deptColor(n.data.department));
+    nd.append('rect').attr('y',2).attr('width',CARD_W).attr('height',3).attr('fill',n=>deptColor(n.data.department));
+    nd.append('text').attr('x',CARD_W/2).attr('y',28).attr('text-anchor','middle')
+      .attr('font-size',12).attr('font-weight','700').attr('fill','#0f172a')
+      .attr('font-family',"-apple-system,'Segoe UI',sans-serif").text(n=>cut(n.data.name,24));
     nd.append('text').attr('x',CARD_W/2).attr('y',46).attr('text-anchor','middle')
       .attr('font-size',10).attr('fill','#64748b')
       .attr('font-family',"-apple-system,'Segoe UI',sans-serif").text(n=>cut(n.data.title,30));
-    // Children badge
-    nd.filter(n=>n.children&&n.children.length>0)
-      .append('circle').attr('cx',CARD_W-11).attr('cy',CARD_H-11).attr('r',9.5)
-      .attr('fill',n=>lc(titleLevel(n.data.title)));
-    nd.filter(n=>n.children&&n.children.length>0)
-      .append('text').attr('x',CARD_W-11).attr('y',CARD_H-11)
-      .attr('text-anchor','middle').attr('dominant-baseline','middle')
-      .attr('font-size',9).attr('font-weight','800').attr('fill','white')
-      .text(n=>n.children.length);
+    nd.each(function(n){
+      const dept=n.data.department; if(!dept)return;
+      const g2=d3.select(this), tw=dept.length*5.5+14, bx=CARD_W/2-tw/2;
+      g2.append('rect').attr('x',bx).attr('y',56).attr('width',tw).attr('height',16).attr('rx',8).attr('fill',deptColor(dept)).attr('opacity',0.12);
+      g2.append('text').attr('x',CARD_W/2).attr('y',67).attr('text-anchor','middle').attr('font-size',8.5).attr('font-weight','700').attr('fill',deptColor(dept)).attr('font-family',"-apple-system,'Segoe UI',sans-serif").text(dept);
+    });
+    nd.filter(n=>n.children&&n.children.length>0).append('circle').attr('cx',CARD_W-12).attr('cy',CARD_H-12).attr('r',10).attr('fill',n=>deptColor(n.data.department));
+    nd.filter(n=>n.children&&n.children.length>0).append('text').attr('x',CARD_W-12).attr('y',CARD_H-12).attr('text-anchor','middle').attr('dominant-baseline','middle').attr('font-size',9).attr('font-weight','800').attr('fill','white').text(n=>n.children.length);
+    nd.append('rect').attr('width',CARD_W).attr('height',CARD_H).attr('rx',10).attr('fill','transparent');
 
-    // Drag hint overlay (center of card for grab)
-    nd.append('rect').attr('class','drag-handle')
-      .attr('width',CARD_W).attr('height',CARD_H).attr('rx',9).attr('fill','transparent').attr('stroke','none');
-
-    // ── DRAG BEHAVIOR ──────────────────────────────────────────────────────────
     const drag = d3.drag()
-      .on('start', function(event, d) {
-        if (event.sourceEvent) event.sourceEvent.stopPropagation();
-        didDrag = false;
-        dragNode = d;
-        d3.select(this).raise().style('cursor','grabbing');
-        d3.select(this).select('.card-bg').attr('filter','url(#sh2)').attr('stroke-width',2.5).attr('opacity',0.92);
+      .on('start', function(event,d){if(event.sourceEvent)event.sourceEvent.stopPropagation();didDrag=false;dragNode=d;d3.select(this).raise().style('cursor','grabbing');d3.select(this).select('.card-bg').attr('filter','url(#sh2)').attr('stroke-width',2.5).attr('opacity',0.92);})
+      .on('drag', function(event,d){
+        if(Math.abs(event.dx)<1&&Math.abs(event.dy)<1&&!didDrag)return;didDrag=true;
+        d3.select(this).attr('transform',`translate(${event.x-CARD_W/2},${event.y-CARD_H/2})`);
+        let nearest=null,minDist=100;
+        nodes.forEach(n=>{if(n===d||n===d.parent||isAncestorOf(d,n))return;const dist=Math.hypot(n.x-event.x,(n.y+CARD_H/2)-event.y);if(dist<minDist){minDist=dist;nearest=n;}});
+        if(nearest!==dropTarget){if(dropTarget)nodeGroup.selectAll('.nd').filter(n=>n===dropTarget).select('.card-bg').attr('stroke','#e2e8f0').attr('stroke-width',1.5);dropTarget=nearest;if(dropTarget)nodeGroup.selectAll('.nd').filter(n=>n===dropTarget).select('.card-bg').attr('stroke','#10b981').attr('stroke-width',3);}
       })
-      .on('drag', function(event, d) {
-        if (Math.abs(event.dx) < 1 && Math.abs(event.dy) < 1 && !didDrag) return;
-        didDrag = true;
-        // Move dragged card with mouse (event coords are in tree space via D3)
-        d3.select(this).attr('transform', `translate(${event.x - CARD_W/2},${event.y - CARD_H/2})`);
-
-        // Find nearest valid drop target
-        let nearest = null, minDist = 90;
-        nodes.forEach(n => {
-          if (n === d || n === d.parent || isAncestorOf(d, n)) return;
-          const dist = Math.hypot(n.x - event.x, (n.y + CARD_H/2) - event.y);
-          if (dist < minDist) { minDist = dist; nearest = n; }
-        });
-
-        // Update drop target highlight
-        if (nearest !== dropTarget) {
-          if (dropTarget) {
-            nodeGroup.selectAll('.nd').filter(n=>n===dropTarget).select('.card-bg')
-              .attr('stroke',n=>lc(titleLevel(n.data.title))).attr('stroke-width',1.5).attr('stroke-dasharray',null);
-          }
-          dropTarget = nearest;
-          if (dropTarget) {
-            nodeGroup.selectAll('.nd').filter(n=>n===dropTarget).select('.card-bg')
-              .attr('stroke','#10b981').attr('stroke-width',2.5).attr('stroke-dasharray','0');
-          }
-        }
-      })
-      .on('end', function(event, d) {
-        d3.select(this).style('cursor','grab');
-        d3.select(this).select('.card-bg').attr('filter','url(#sh)').attr('stroke-width',1.5).attr('opacity',1);
-
-        // Clear drop target highlight
-        if (dropTarget) {
-          nodeGroup.selectAll('.nd').filter(n=>n===dropTarget).select('.card-bg')
-            .attr('stroke',n=>lc(titleLevel(n.data.title))).attr('stroke-width',1.5).attr('stroke-dasharray',null);
-        }
-
-        if (!didDrag) {
-          // It was a click — select contact
-          d3.select(this).attr('transform',`translate(${d.x-CARD_W/2},${d.y})`);
-          onSelect(d.data);
-          dropTarget = null;
-          dragNode = null;
-          return;
-        }
-
-        if (dropTarget && dropTarget !== d && dropTarget !== d.parent) {
-          // Valid drop — reparent
-          onReparent(d.data.id, dropTarget.data.id);
-        } else {
-          // Snap back
-          d3.select(this).transition().duration(220).ease(d3.easeCubicOut)
-            .attr('transform',`translate(${d.x-CARD_W/2},${d.y})`);
-        }
-
-        dropTarget = null;
-        dragNode = null;
+      .on('end', function(event,d){
+        d3.select(this).style('cursor','grab');d3.select(this).select('.card-bg').attr('filter','url(#sh)').attr('stroke-width',1.5).attr('opacity',1);
+        if(dropTarget)nodeGroup.selectAll('.nd').filter(n=>n===dropTarget).select('.card-bg').attr('stroke','#e2e8f0').attr('stroke-width',1.5);
+        if(!didDrag){d3.select(this).attr('transform',`translate(${d.x-CARD_W/2},${d.y})`);onSelect(d.data);dropTarget=null;dragNode=null;return;}
+        if(dropTarget&&dropTarget!==d&&dropTarget!==d.parent){onReparent(d.data.id,dropTarget.data.id);}
+        else{d3.select(this).transition().duration(220).ease(d3.easeCubicOut).attr('transform',`translate(${d.x-CARD_W/2},${d.y})`);}
+        dropTarget=null;dragNode=null;
       });
-
     nd.call(drag);
+    svg.on('click',()=>onSelect(null));
+  },[data,onSelect,onReparent,zoomRef]);
 
-    svg.on('click', () => onSelect(null));
-
-  }, [data, onSelect, onReparent]);
-
-  useEffect(()=>{
-    draw();
-    const ro = new ResizeObserver(draw);
-    if (svgRef.current?.parentElement) ro.observe(svgRef.current.parentElement);
-    return ()=>ro.disconnect();
-  }, [draw]);
-
-  return (
+  useEffect(()=>{draw();const ro=new ResizeObserver(draw);if(svgRef.current?.parentElement)ro.observe(svgRef.current.parentElement);return()=>ro.disconnect();},[draw]);
+  return(
     <div style={{position:'relative',width:'100%',height:'100%'}}>
       <svg ref={svgRef} style={{display:'block',width:'100%',height:'100%'}} />
-      <div style={{
-        position:'absolute',bottom:12,left:'50%',transform:'translateX(-50%)',
-        background:'rgba(255,255,255,0.85)',backdropFilter:'blur(6px)',
-        border:'1px solid #e2e8f0',borderRadius:20,padding:'5px 14px',
-        fontSize:12,color:'#94a3b8',pointerEvents:'none',whiteSpace:'nowrap',
-        boxShadow:'0 1px 6px rgba(0,0,0,0.06)',
-      }}>
-        Drag cards to rearrange · Click to view details · Scroll to zoom
+      <div style={{position:'absolute',bottom:12,left:'50%',transform:'translateX(-50%)',background:'rgba(255,255,255,0.88)',backdropFilter:'blur(6px)',border:'1px solid #e2e8f0',borderRadius:20,padding:'5px 16px',fontSize:12,color:'#94a3b8',pointerEvents:'none',whiteSpace:'nowrap',boxShadow:'0 1px 6px rgba(0,0,0,0.06)'}}>
+        Drag cards to rearrange &middot; Click to view details &middot; Scroll to zoom
       </div>
     </div>
   );
 }
 
-// ─── Contact Panel ─────────────────────────────────────────────────────────────
-function ContactPanel({contact,onClose}){
-  if(!contact) return null;
-  const color=lc(titleLevel(contact.title));
-  return(
-    <div style={{position:'absolute',top:12,right:12,width:264,background:'white',borderRadius:12,overflow:'hidden',boxShadow:'0 8px 32px rgba(0,0,0,0.14)',fontFamily:"-apple-system,'Segoe UI',sans-serif",animation:'fadeIn .15s ease',zIndex:10}}>
+// ─── People Finder Panel ──────────────────────────────────────────────────
+function PeopleFinder({ open, onClose, apiKey, people, onAddPerson, companyName, onRequestApiKey }) {
+  const [searchCo, setSearchCo] = useState('');
+  const [searchRole, setSearchRole] = useState('');
+  const [results, setResults] = useState([]);
+  const [searching, setSearching] = useState(false);
+  const [error, setError] = useState('');
+  const [addingIdx, setAddingIdx] = useState(null); // index of result being added — show parent picker
+  const [parentId, setParentId] = useState('');
+
+  useEffect(() => { if (companyName) setSearchCo(companyName); }, [companyName]);
+
+  const handleSearch = async (e) => {
+    e && e.preventDefault();
+    if (!searchCo.trim()) return;
+    if (!apiKey) { onRequestApiKey(); return; }
+    setSearching(true); setError(''); setResults([]);
+    try {
+      const r = await searchPeople(searchCo.trim(), searchRole.trim(), apiKey);
+      setResults(r);
+    } catch(err) { setError(err.message); }
+    setSearching(false);
+  };
+
+  const existingNames = new Set(people.map(p => p.name.toLowerCase()));
+
+  const handleAdd = (person) => {
+    const dept = person.department || guessDept(person.title);
+    onAddPerson({ name: person.name, title: person.title, department: dept, parentId: parentId || people[0]?.id || null });
+    setAddingIdx(null); setParentId('');
+  };
+
+  if (!open) return null;
+
+  return (
+    <div style={{
+      position:'absolute', top:0, left:0, width:320, height:'100%', background:'white',
+      borderRight:'1px solid #e2e8f0', zIndex:15, display:'flex', flexDirection:'column',
+      boxShadow:'4px 0 24px rgba(0,0,0,0.08)', animation:'slideIn .2s ease',
+      fontFamily:"-apple-system,'Segoe UI',sans-serif"
+    }}>
+      {/* Header */}
+      <div style={{padding:'14px 16px',borderBottom:'1px solid #e8ecf2',display:'flex',alignItems:'center',justifyContent:'space-between',flexShrink:0}}>
+        <div style={{display:'flex',alignItems:'center',gap:8}}>
+          <span style={{fontSize:18}}>&#128269;</span>
+          <span style={{fontWeight:800,fontSize:15,color:'#0f172a'}}>People Finder</span>
+        </div>
+        <button onClick={onClose} style={{background:'none',border:'none',cursor:'pointer',color:'#94a3b8',fontSize:22,lineHeight:1}}>x</button>
+      </div>
+
+      {/* Search Form */}
+      <form onSubmit={handleSearch} style={{padding:'12px 16px',borderBottom:'1px solid #f1f5f9',flexShrink:0}}>
+        <label className="field-label">Company</label>
+        <input value={searchCo} onChange={e=>setSearchCo(e.target.value)} className="field-input" placeholder="e.g. Snowflake" style={{marginBottom:8}}/>
+        <label className="field-label">Role / Department (optional)</label>
+        <input value={searchRole} onChange={e=>setSearchRole(e.target.value)} className="field-input" placeholder="e.g. Sales, VP, Engineering" style={{marginBottom:10}}/>
+        <button type="submit" disabled={!searchCo.trim()||searching} className="btn-primary" style={{width:'100%',fontSize:13,padding:'9px 0',opacity:searchCo.trim()&&!searching?1:0.5}}>
+          {searching ? (
+            <span style={{display:'flex',alignItems:'center',justifyContent:'center',gap:8}}>
+              <span style={{display:'inline-block',width:14,height:14,border:'2px solid white',borderTop:'2px solid transparent',borderRadius:'50%',animation:'spin .6s linear infinite'}}/>
+              Searching...
+            </span>
+          ) : 'Search People'}
+        </button>
+        {!apiKey && <div style={{fontSize:11,color:'#f59e0b',marginTop:6,textAlign:'center'}}>API key required — click to set up</div>}
+      </form>
+
+      {/* Results */}
+      <div style={{flex:1,overflow:'auto',padding:'12px 16px'}}>
+        {error && <div style={{color:'#dc2626',fontSize:12,marginBottom:8}}>{error}</div>}
+        {results.length > 0 && <div style={{fontSize:11,color:'#94a3b8',marginBottom:8,fontWeight:600}}>{results.length} people found</div>}
+        {results.map((person, idx) => {
+          const alreadyAdded = existingNames.has(person.name.toLowerCase());
+          const isAdding = addingIdx === idx;
+          return (
+            <div key={idx} className="finder-card" style={{opacity:alreadyAdded?0.5:1}}>
+              <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',gap:6}}>
+                <div style={{flex:1,minWidth:0}}>
+                  <div style={{fontWeight:700,fontSize:12,color:'#0f172a',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{person.name}</div>
+                  <div style={{fontSize:10,color:'#64748b',marginTop:1}}>{person.title}</div>
+                  {person.department && <span style={{display:'inline-block',fontSize:8.5,background:deptColor(person.department||'Executive')+'1a',color:deptColor(person.department||'Executive'),borderRadius:4,padding:'1px 6px',fontWeight:700,marginTop:3}}>{person.department}</span>}
+                </div>
+                {alreadyAdded ? (
+                  <span style={{fontSize:10,color:'#10b981',fontWeight:700,whiteSpace:'nowrap',paddingTop:2}}>&#10003; Added</span>
+                ) : (
+                  <button onClick={()=>{setAddingIdx(isAdding?null:idx);setParentId(people[0]?.id||'');}} className="finder-add-btn">{isAdding?'Cancel':'+ Add'}</button>
+                )}
+              </div>
+              {isAdding && !alreadyAdded && (
+                <div style={{marginTop:8,paddingTop:8,borderTop:'1px solid #f1f5f9'}}>
+                  <label style={{fontSize:10,fontWeight:700,color:'#64748b',display:'block',marginBottom:3}}>Reports to:</label>
+                  <select value={parentId} onChange={e=>setParentId(e.target.value)} style={{width:'100%',padding:'6px 8px',borderRadius:6,border:'1.5px solid #e2e8f0',fontSize:11,marginBottom:6}}>
+                    {people.map(p=><option key={p.id} value={p.id}>{p.name} — {cut(p.title,20)}</option>)}
+                  </select>
+                  <button onClick={()=>handleAdd(person)} className="btn-primary" style={{width:'100%',fontSize:12,padding:'7px 0'}}>Drop into Chart</button>
+                </div>
+              )}
+            </div>
+          );
+        })}
+        {results.length === 0 && !searching && !error && (
+          <div style={{textAlign:'center',color:'#94a3b8',fontSize:12,marginTop:40,lineHeight:1.7}}>
+            Search for people at any company.<br/>Click <strong>+ Add</strong> to drop them into your org chart.
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ─── Contact Panel ──────────────────────────────────────────────────────────
+function ContactPanel({contact, people, onClose, onUpdate, onDelete}) {
+  const [editing, setEditing] = useState(false);
+  const [form, setForm] = useState({});
+  const [confirmDel, setConfirmDel] = useState(false);
+  useEffect(()=>{ if(contact){setEditing(false);setConfirmDel(false);setForm({...contact});} },[contact]);
+  if (!contact) return null;
+  const color = deptColor(contact.department);
+  const handleSave = () => { onUpdate(form); setEditing(false); };
+  return (
+    <div style={{position:'absolute',top:12,right:12,width:280,background:'white',borderRadius:14,overflow:'hidden',boxShadow:'0 8px 32px rgba(0,0,0,0.14)',fontFamily:"-apple-system,'Segoe UI',sans-serif",animation:'fadeIn .15s ease',zIndex:10}}>
       <div style={{height:5,background:color}}/>
       <div style={{padding:'14px 16px'}}>
         <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',marginBottom:10}}>
-          <div>
-            <div style={{fontWeight:700,fontSize:14,color:'#0f172a',marginBottom:2}}>{contact.name}</div>
-            <div style={{fontSize:11,color:color,fontWeight:600}}>{contact.title}</div>
+          <div style={{flex:1}}>
+            {editing ? (
+              <>
+                <input value={form.name||''} onChange={e=>setForm({...form,name:e.target.value})} className="field-input" style={{marginBottom:6,fontWeight:700,fontSize:14}} placeholder="Name"/>
+                <input value={form.title||''} onChange={e=>setForm({...form,title:e.target.value})} className="field-input" style={{marginBottom:6,fontSize:12}} placeholder="Title"/>
+                <select value={form.department||''} onChange={e=>setForm({...form,department:e.target.value})} className="field-input" style={{marginBottom:6,fontSize:12}}>
+                  {Object.keys(DEPT_COLORS).map(d=><option key={d} value={d}>{d}</option>)}
+                </select>
+                <input value={form.email||''} onChange={e=>setForm({...form,email:e.target.value})} className="field-input" style={{marginBottom:6,fontSize:12}} placeholder="Email"/>
+                <input value={form.phone||''} onChange={e=>setForm({...form,phone:e.target.value})} className="field-input" style={{marginBottom:6,fontSize:12}} placeholder="Phone"/>
+                <div style={{display:'flex',gap:6}}><button onClick={handleSave} className="btn-primary" style={{fontSize:12,padding:'6px 14px'}}>Save</button><button onClick={()=>setEditing(false)} className="btn-secondary" style={{fontSize:12,padding:'6px 14px'}}>Cancel</button></div>
+              </>
+            ) : (
+              <>
+                <div style={{fontWeight:700,fontSize:14,color:'#0f172a',marginBottom:2}}>{contact.name}</div>
+                <div style={{fontSize:12,color:color,fontWeight:600,marginBottom:4}}>{contact.title}</div>
+                {contact.department&&<div style={{display:'inline-block',fontSize:10,background:color+'1a',color:color,borderRadius:6,padding:'2px 8px',fontWeight:700,marginBottom:8}}>{contact.department}</div>}
+                {contact.email&&<PRow k="Email" v={contact.email}/>}
+                {contact.phone&&<PRow k="Phone" v={contact.phone}/>}
+              </>
+            )}
           </div>
-          <button onClick={onClose} style={{background:'none',border:'none',cursor:'pointer',color:'#94a3b8',fontSize:20,lineHeight:1,paddingLeft:8}}>×</button>
+          <button onClick={onClose} style={{background:'none',border:'none',cursor:'pointer',color:'#94a3b8',fontSize:22,lineHeight:1,paddingLeft:8,flexShrink:0}}>x</button>
         </div>
-        {contact.department&&<PRow k="Department" v={contact.department}/>}
-        {contact.email&&<PRow k="Email" v={<a href={`mailto:${contact.email}`} style={{color:'#6366f1',textDecoration:'none'}}>{contact.email}</a>}/>}
-        {contact.phone&&<PRow k="Phone" v={contact.phone}/>}
-        {contact.linkedin&&<PRow k="LinkedIn" v={<a href={contact.linkedin} target="_blank" rel="noreferrer" style={{color:'#6366f1',textDecoration:'none'}}>View profile →</a>}/>}
+        {!editing&&<div style={{display:'flex',gap:6,borderTop:'1px solid #f1f5f9',paddingTop:10,marginTop:4}}>
+          <button onClick={()=>setEditing(true)} className="toolbar-btn" style={{fontSize:11}}>Edit</button>
+          {!confirmDel?<button onClick={()=>setConfirmDel(true)} className="btn-danger" style={{fontSize:11,padding:'5px 12px'}}>Delete</button>:
+          <div style={{display:'flex',gap:4,alignItems:'center'}}><span style={{fontSize:11,color:'#dc2626'}}>Sure?</span><button onClick={()=>onDelete(contact.id)} className="btn-danger" style={{fontSize:11,padding:'4px 10px'}}>Yes</button><button onClick={()=>setConfirmDel(false)} className="btn-secondary" style={{fontSize:11,padding:'4px 10px'}}>No</button></div>}
+        </div>}
       </div>
     </div>
   );
 }
-function PRow({k,v}){return(
-  <div style={{marginBottom:7}}>
-    <div style={{fontSize:9,color:'#94a3b8',fontWeight:700,textTransform:'uppercase',letterSpacing:'0.07em',marginBottom:2}}>{k}</div>
-    <div style={{fontSize:11,color:'#334155'}}>{v}</div>
-  </div>
-);}
+function PRow({k,v}){return(<div style={{marginBottom:6}}><div style={{fontSize:9,color:'#94a3b8',fontWeight:700,textTransform:'uppercase',letterSpacing:'0.07em',marginBottom:2}}>{k}</div><div style={{fontSize:11,color:'#334155'}}>{v}</div></div>);}
 
-// ─── Toolbar ───────────────────────────────────────────────────────────────────
-function Toolbar({company,sources,count,canUndo,onBack,onUndo,onReset,modified}){
-  return(
-    <div style={{height:54,background:'white',borderBottom:'1px solid #e8ecf2',display:'flex',alignItems:'center',padding:'0 16px',gap:10,flexShrink:0,fontFamily:"-apple-system,'Segoe UI',sans-serif"}}>
-      <button onClick={onBack} style={{background:'none',border:'1px solid #e2e8f0',borderRadius:8,padding:'5px 12px',fontSize:13,cursor:'pointer',color:'#475569',fontWeight:600}}>← Back</button>
-      <div style={{fontWeight:800,fontSize:16,color:'#0f172a'}}>{company}</div>
-      <div style={{fontSize:12,color:'#94a3b8'}}>{count} people</div>
-
-      {modified&&(
-        <div style={{display:'flex',gap:6,marginLeft:4}}>
-          <button onClick={onUndo} disabled={!canUndo} style={{
-            padding:'5px 12px',borderRadius:7,border:'1px solid #e2e8f0',background:'white',
-            cursor:canUndo?'pointer':'default',fontSize:12,color:canUndo?'#475569':'#cbd5e1',fontWeight:500,
-          }}>↩ Undo</button>
-          <button onClick={onReset} style={{
-            padding:'5px 12px',borderRadius:7,border:'1px solid #fca5a5',background:'#fff5f5',
-            cursor:'pointer',fontSize:12,color:'#dc2626',fontWeight:500,
-          }}>Reset</button>
-          <span style={{fontSize:11,color:'#10b981',fontWeight:600,display:'flex',alignItems:'center',gap:4}}>
-            <span style={{width:6,height:6,borderRadius:'50%',background:'#10b981',display:'inline-block'}}/>
-            Edited
-          </span>
-        </div>
-      )}
-
-      <div style={{marginLeft:'auto',display:'flex',gap:5,alignItems:'center',flexWrap:'wrap'}}>
-        <span style={{fontSize:11,color:'#94a3b8'}}>Sources:</span>
-        {(sources||[]).map(s=>(
-          <span key={s} style={{fontSize:11,background:'#eef2ff',color:'#4f46e5',borderRadius:5,padding:'2px 8px',fontWeight:600}}>{s}</span>
-        ))}
+// ─── Add Contact Modal ────────────────────────────────────────────────────
+function AddContactModal({people,onSave,onClose}) {
+  const [form,setForm] = useState({name:'',title:'',department:'Sales',email:'',phone:'',parentId:people[0]?.id||''});
+  const go = () => { if(form.name.trim()&&form.title.trim()){onSave(form);onClose();} };
+  return (
+    <div className="modal-overlay"><div className="modal-box" style={{width:440}}>
+      <h2 style={{fontSize:20,fontWeight:800,color:'#0f172a',marginBottom:16}}>Add Contact</h2>
+      <label className="field-label">Name *</label>
+      <input value={form.name} onChange={e=>setForm({...form,name:e.target.value})} className="field-input" placeholder="e.g. Jane Smith" autoFocus/>
+      <label className="field-label">Title *</label>
+      <input value={form.title} onChange={e=>setForm({...form,title:e.target.value})} className="field-input" placeholder="e.g. VP of Engineering"/>
+      <label className="field-label">Department</label>
+      <select value={form.department} onChange={e=>setForm({...form,department:e.target.value})} className="field-input">{Object.keys(DEPT_COLORS).map(d=><option key={d} value={d}>{d}</option>)}</select>
+      <label className="field-label">Reports To</label>
+      <select value={form.parentId} onChange={e=>setForm({...form,parentId:e.target.value})} className="field-input">{people.map(p=><option key={p.id} value={p.id}>{p.name} — {p.title}</option>)}</select>
+      <div style={{display:'flex',gap:8,justifyContent:'flex-end',marginTop:4}}>
+        <button onClick={onClose} className="btn-secondary">Cancel</button>
+        <button onClick={go} disabled={!form.name.trim()||!form.title.trim()} className="btn-primary" style={{opacity:form.name.trim()&&form.title.trim()?1:0.5}}>Add to Chart</button>
       </div>
-    </div>
+    </div></div>
   );
 }
 
-// ─── API Key Modal ─────────────────────────────────────────────────────────────
+// ─── API Key Modal ────────────────────────────────────────────────────────
 function ApiKeyModal({apiKey,pendingCompany,onSave,onClose}){
   const [val,setVal]=useState(apiKey||'');
   const go=()=>{const k=val.trim();if(k){onSave(k);onClose(k);}};
   return(
-    <div style={{position:'fixed',inset:0,background:'rgba(15,23,42,0.5)',display:'flex',alignItems:'center',justifyContent:'center',zIndex:200,fontFamily:"-apple-system,'Segoe UI',sans-serif"}}>
-      <div style={{background:'white',borderRadius:16,padding:32,width:460,boxShadow:'0 24px 64px rgba(0,0,0,0.18)',animation:'fadeIn .18s ease'}}>
-        <div style={{fontSize:36,marginBottom:12}}>🔑</div>
-        <h2 style={{fontSize:20,fontWeight:800,color:'#0f172a',marginBottom:8}}>{pendingCompany?`Look up ${pendingCompany}`:'Enable any-company lookup'}</h2>
-        <p style={{fontSize:13,color:'#64748b',lineHeight:1.65,marginBottom:20}}>
-          Paste your Anthropic API key to search any company in real time — <strong>one-time setup</strong>, stored only in your browser.<br/><br/>
-          Get a free key at{' '}
-          <a href="https://console.anthropic.com/settings/keys" target="_blank" rel="noreferrer" style={{color:'#6366f1',fontWeight:600}}>console.anthropic.com → API Keys</a>
-        </p>
-        <input value={val} onChange={e=>setVal(e.target.value)} onKeyDown={e=>e.key==='Enter'&&go()}
-          placeholder="sk-ant-api03-..." autoFocus
-          style={{width:'100%',padding:'12px 14px',borderRadius:8,border:'1.5px solid #e2e8f0',fontSize:13,marginBottom:16,fontFamily:'monospace'}}/>
-        <div style={{display:'flex',gap:8,justifyContent:'flex-end'}}>
-          <button onClick={()=>onClose(null)} style={{padding:'10px 18px',borderRadius:8,border:'1px solid #e2e8f0',background:'white',cursor:'pointer',fontSize:13,color:'#475569'}}>Cancel</button>
-          <button onClick={go} disabled={!val.trim()} style={{padding:'10px 22px',borderRadius:8,border:'none',background:'linear-gradient(135deg,#6366f1,#8b5cf6)',color:'white',cursor:'pointer',fontSize:14,fontWeight:700,opacity:val.trim()?1:0.5}}>
-            {pendingCompany?`Search ${pendingCompany} →`:'Save & Enable'}
-          </button>
+    <div className="modal-overlay"><div className="modal-box" style={{width:460}}>
+      <div style={{fontSize:36,marginBottom:12}}>&#128273;</div>
+      <h2 style={{fontSize:20,fontWeight:800,color:'#0f172a',marginBottom:8}}>{pendingCompany?`Look up ${pendingCompany}`:'Enable People Finder & Live Lookup'}</h2>
+      <p style={{fontSize:13,color:'#64748b',lineHeight:1.65,marginBottom:20}}>
+        Paste your Anthropic API key to search for people at any company. <strong>One-time setup</strong>, stored only in your browser.<br/><br/>
+        Get a key at{' '}<a href="https://console.anthropic.com/settings/keys" target="_blank" rel="noreferrer" style={{color:'#6366f1',fontWeight:600}}>console.anthropic.com</a>
+      </p>
+      <input value={val} onChange={e=>setVal(e.target.value)} onKeyDown={e=>e.key==='Enter'&&go()} placeholder="sk-ant-api03-..." autoFocus className="field-input" style={{fontFamily:'monospace',marginBottom:16}}/>
+      <div style={{display:'flex',gap:8,justifyContent:'flex-end'}}>
+        <button onClick={()=>onClose(null)} className="btn-secondary">Cancel</button>
+        <button onClick={go} disabled={!val.trim()} className="btn-primary" style={{opacity:val.trim()?1:0.5}}>{pendingCompany?`Search ${pendingCompany}`:'Save & Enable'}</button>
+      </div>
+    </div></div>
+  );
+}
+
+// ─── Toolbar ──────────────────────────────────────────────────────────────
+function Toolbar({company,sources,count,canUndo,onBack,onUndo,onReset,modified,onAddContact,onToggleFinder,finderOpen}){
+  return(
+    <div style={{height:56,background:'white',borderBottom:'1px solid #e8ecf2',display:'flex',alignItems:'center',padding:'0 16px',gap:8,flexShrink:0,fontFamily:"-apple-system,'Segoe UI',sans-serif"}}>
+      <button onClick={onBack} className="toolbar-btn">&#8592; Back</button>
+      <div style={{fontWeight:800,fontSize:16,color:'#0f172a'}}>{company}</div>
+      <div style={{fontSize:12,color:'#94a3b8'}}>{count} people</div>
+      <div style={{display:'flex',gap:6,marginLeft:8}}>
+        <button onClick={onToggleFinder} className="toolbar-btn" style={{color:finderOpen?'white':'#6366f1',borderColor:finderOpen?'#6366f1':'#c7d2fe',background:finderOpen?'#6366f1':'white'}}>
+          &#128269; People Finder
+        </button>
+        <button onClick={onAddContact} className="toolbar-btn" style={{color:'#6366f1',borderColor:'#c7d2fe'}}>+ Add Person</button>
+      </div>
+      {modified&&(
+        <div style={{display:'flex',gap:6,marginLeft:4}}>
+          <button onClick={onUndo} disabled={!canUndo} className="toolbar-btn" style={{color:canUndo?'#475569':'#cbd5e1'}}>&#8617; Undo</button>
+          <button onClick={onReset} className="btn-danger" style={{fontSize:12}}>Reset</button>
+          <span style={{fontSize:11,color:'#10b981',fontWeight:600,display:'flex',alignItems:'center',gap:4}}>
+            <span style={{width:6,height:6,borderRadius:'50%',background:'#10b981',display:'inline-block'}}/>Edited
+          </span>
         </div>
+      )}
+      <div style={{marginLeft:'auto',display:'flex',gap:5,alignItems:'center',flexWrap:'wrap'}}>
+        <span style={{fontSize:11,color:'#94a3b8'}}>Sources:</span>
+        {(sources||[]).map(s=>(<span key={s} style={{fontSize:11,background:'#eef2ff',color:'#4f46e5',borderRadius:5,padding:'2px 8px',fontWeight:600}}>{s}</span>))}
       </div>
     </div>
   );
 }
 
-// ─── Search Screen ─────────────────────────────────────────────────────────────
+function ZoomControls({zoomRef}){return(
+  <div style={{position:'absolute',bottom:16,right:16,display:'flex',flexDirection:'column',gap:6,zIndex:5}}>
+    <button className="zoom-btn" onClick={()=>zoomRef.current?.zoomIn()} title="Zoom in">+</button>
+    <button className="zoom-btn" onClick={()=>zoomRef.current?.zoomOut()} title="Zoom out">-</button>
+    <button className="zoom-btn" onClick={()=>zoomRef.current?.fitView()} title="Fit to screen" style={{fontSize:14}}>&#8862;</button>
+  </div>
+);}
+
+// ─── Search Screen ────────────────────────────────────────────────────────
 const CHIPS = ['Nike','Workday','Salesforce','ServiceNow','Snowflake','HubSpot','Zendesk','Databricks'];
 function SearchScreen({onSearch,apiKey,onSettings}){
   const [val,setVal]=useState('');
@@ -490,46 +586,28 @@ function SearchScreen({onSearch,apiKey,onSettings}){
     <div style={{display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',height:'100%',background:'#f8fafc',padding:24,fontFamily:"-apple-system,'Segoe UI',sans-serif"}}>
       <div style={{marginBottom:40,textAlign:'center'}}>
         <div style={{width:62,height:62,borderRadius:17,background:'linear-gradient(135deg,#6366f1,#8b5cf6)',display:'flex',alignItems:'center',justifyContent:'center',margin:'0 auto 16px',boxShadow:'0 6px 24px rgba(99,102,241,0.32)'}}>
-          <svg width="30" height="30" viewBox="0 0 24 24" fill="none">
-            <circle cx="12" cy="3.5" r="2.6" fill="white"/>
-            <circle cx="4" cy="17" r="2.6" fill="white"/>
-            <circle cx="20" cy="17" r="2.6" fill="white"/>
-            <line x1="12" y1="6.1" x2="4" y2="14.4" stroke="white" strokeWidth="1.9" strokeLinecap="round"/>
-            <line x1="12" y1="6.1" x2="20" y2="14.4" stroke="white" strokeWidth="1.9" strokeLinecap="round"/>
-          </svg>
+          <svg width="30" height="30" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="3.5" r="2.6" fill="white"/><circle cx="4" cy="17" r="2.6" fill="white"/><circle cx="20" cy="17" r="2.6" fill="white"/><line x1="12" y1="6.1" x2="4" y2="14.4" stroke="white" strokeWidth="1.9" strokeLinecap="round"/><line x1="12" y1="6.1" x2="20" y2="14.4" stroke="white" strokeWidth="1.9" strokeLinecap="round"/></svg>
         </div>
         <h1 style={{fontSize:36,fontWeight:900,color:'#0f172a',letterSpacing:'-0.025em',marginBottom:8}}>OrgChart</h1>
         <p style={{color:'#64748b',fontSize:15}}>Visual leadership intelligence for every account</p>
       </div>
-
       <form onSubmit={go} style={{width:'100%',maxWidth:520}}>
         <div style={{display:'flex',gap:8,boxShadow:'0 2px 16px rgba(0,0,0,0.07)',borderRadius:14}}>
-          <input value={val} onChange={e=>setVal(e.target.value)} placeholder="Type any company name..." autoFocus
-            style={{flex:1,padding:'15px 20px',borderRadius:'14px 0 0 14px',fontSize:15,border:'1.5px solid #e2e8f0',borderRight:'none',background:'white',color:'#0f172a'}}/>
-          <button type="submit" disabled={!val.trim()} style={{padding:'15px 26px',borderRadius:'0 14px 14px 0',fontSize:15,fontWeight:700,background:'linear-gradient(135deg,#6366f1,#8b5cf6)',color:'white',border:'none',cursor:'pointer',whiteSpace:'nowrap'}}>
-            Search →
-          </button>
+          <input value={val} onChange={e=>setVal(e.target.value)} placeholder="Type any company name..." autoFocus style={{flex:1,padding:'15px 20px',borderRadius:'14px 0 0 14px',fontSize:15,border:'1.5px solid #e2e8f0',borderRight:'none',background:'white',color:'#0f172a'}}/>
+          <button type="submit" disabled={!val.trim()} className="btn-primary" style={{borderRadius:'0 14px 14px 0',padding:'15px 26px',fontSize:15}}>Search</button>
         </div>
       </form>
-
       <div style={{marginTop:14,display:'flex',gap:7,flexWrap:'wrap',justifyContent:'center',maxWidth:520}}>
-        {CHIPS.map(co=>(
-          <button key={co} onClick={()=>onSearch(co)} style={{padding:'6px 15px',borderRadius:20,fontSize:13,background:'white',border:'1.5px solid #e2e8f0',color:'#475569',cursor:'pointer',fontWeight:500}}>{co}</button>
-        ))}
+        {CHIPS.map(co=>(<button key={co} onClick={()=>onSearch(co)} style={{padding:'6px 15px',borderRadius:20,fontSize:13,background:'white',border:'1.5px solid #e2e8f0',color:'#475569',cursor:'pointer',fontWeight:500}}>{co}</button>))}
       </div>
-
       {!apiKey?(
         <div style={{marginTop:24,background:'#eef2ff',border:'1.5px solid #c7d2fe',borderRadius:12,padding:'14px 20px',maxWidth:520,width:'100%',display:'flex',alignItems:'center',justifyContent:'space-between',gap:12}}>
-          <div>
-            <div style={{fontSize:13,fontWeight:700,color:'#3730a3',marginBottom:2}}>Want to search any company?</div>
-            <div style={{fontSize:12,color:'#4f46e5'}}>Add your Anthropic API key — one-time setup, then every account works.</div>
-          </div>
-          <button onClick={onSettings} style={{padding:'9px 16px',borderRadius:8,border:'none',background:'linear-gradient(135deg,#6366f1,#8b5cf6)',color:'white',cursor:'pointer',fontSize:13,fontWeight:700,whiteSpace:'nowrap',flexShrink:0}}>Set up →</button>
+          <div><div style={{fontSize:13,fontWeight:700,color:'#3730a3',marginBottom:2}}>Want to search any company + People Finder?</div><div style={{fontSize:12,color:'#4f46e5'}}>Add your Anthropic API key for live lookup and contact search.</div></div>
+          <button onClick={onSettings} className="btn-primary" style={{fontSize:13,padding:'9px 16px',flexShrink:0}}>Set up</button>
         </div>
       ):(
         <div style={{marginTop:20,display:'flex',alignItems:'center',gap:8,fontSize:12,color:'#94a3b8'}}>
-          <span style={{width:8,height:8,borderRadius:'50%',background:'#10b981',display:'inline-block'}}/>
-          Live lookup active — any company works
+          <span style={{width:8,height:8,borderRadius:'50%',background:'#10b981',display:'inline-block'}}/>Live lookup + People Finder active
           <button onClick={onSettings} style={{color:'#6366f1',background:'none',border:'none',cursor:'pointer',fontSize:12,fontWeight:600,textDecoration:'underline'}}>Change key</button>
         </div>
       )}
@@ -537,34 +615,31 @@ function SearchScreen({onSearch,apiKey,onSettings}){
   );
 }
 
-// ─── Loading Screen ────────────────────────────────────────────────────────────
 function LoadingScreen({company}){
   const [d,setD]=useState('');
   useEffect(()=>{const iv=setInterval(()=>setD(x=>x.length>=3?'':x+'.'),380);return()=>clearInterval(iv);},[]);
-  return(
-    <div style={{display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',height:'100%',background:'#f8fafc',gap:16,fontFamily:"-apple-system,'Segoe UI',sans-serif"}}>
-      <svg width="48" height="48" viewBox="0 0 48 48" style={{animation:'spin 0.9s linear infinite'}}>
-        <circle cx="24" cy="24" r="20" fill="none" stroke="#e2e8f0" strokeWidth="4"/>
-        <path d="M24 4 A20 20 0 0 1 44 24" fill="none" stroke="#6366f1" strokeWidth="4" strokeLinecap="round"/>
-      </svg>
-      <div style={{fontWeight:700,fontSize:19,color:'#0f172a'}}>Building org chart for {company}{d}</div>
-      <div style={{fontSize:13,color:'#94a3b8'}}>Querying leadership data</div>
-    </div>
-  );
+  return(<div style={{display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',height:'100%',background:'#f8fafc',gap:16,fontFamily:"-apple-system,'Segoe UI',sans-serif"}}>
+    <svg width="48" height="48" viewBox="0 0 48 48" style={{animation:'spin 0.9s linear infinite'}}><circle cx="24" cy="24" r="20" fill="none" stroke="#e2e8f0" strokeWidth="4"/><path d="M24 4 A20 20 0 0 1 44 24" fill="none" stroke="#6366f1" strokeWidth="4" strokeLinecap="round"/></svg>
+    <div style={{fontWeight:700,fontSize:19,color:'#0f172a'}}>Building org chart for {company}{d}</div>
+    <div style={{fontSize:13,color:'#94a3b8'}}>Querying leadership data</div>
+  </div>);
 }
 
-// ─── App ───────────────────────────────────────────────────────────────────────
+// ─── App ──────────────────────────────────────────────────────────────────
 function App(){
   const [screen,setScreen]=useState('search');
   const [query,setQuery]=useState('');
-  const [companyMeta,setCompanyMeta]=useState(null); // {name, sources, originalPeople}
-  const [people,setPeople]=useState([]);             // editable flat list
-  const [history,setHistory]=useState([]);            // undo stack
+  const [companyMeta,setCompanyMeta]=useState(null);
+  const [people,setPeople]=useState([]);
+  const [history,setHistory]=useState([]);
   const [selected,setSelected]=useState(null);
   const [showSettings,setShowSettings]=useState(false);
+  const [showAddContact,setShowAddContact]=useState(false);
+  const [finderOpen,setFinderOpen]=useState(false);
   const [pendingCompany,setPendingCompany]=useState(null);
   const [error,setError]=useState('');
   const [apiKey,setApiKey]=useState(()=>{try{return localStorage.getItem('oc_api_key')||'';}catch{return '';}});
+  const zoomRef = useRef(null);
 
   const saveKey=k=>{setApiKey(k);try{k?localStorage.setItem('oc_api_key',k):localStorage.removeItem('oc_api_key');}catch{}};
 
@@ -574,16 +649,14 @@ function App(){
     setHistory([]);
     setScreen('chart');
   };
-
   const runSearch=async(company,key)=>{
-    setQuery(company); setSelected(null); setError('');
+    setQuery(company);setSelected(null);setError('');
     const ck=companyKey(company);
     if(COMPANIES[ck]){loadCompany(COMPANIES[ck]);return;}
     setScreen('loading');
     try{const d=await lookupCompany(company,key);loadCompany(d);}
     catch(e){setError(e.message);setScreen('error');}
   };
-
   const handleSearch=company=>{
     const ck=companyKey(company);
     if(COMPANIES[ck]){runSearch(company,apiKey);return;}
@@ -591,28 +664,24 @@ function App(){
     setPendingCompany(company);setShowSettings(true);
   };
 
-  // Drag reparent
   const handleReparent=useCallback((childId,newParentId)=>{
-    setPeople(prev=>{
-      const next=prev.map(p=>p.id===childId?{...p,parentId:newParentId}:p);
-      setHistory(h=>[...h,prev]);
-      return next;
-    });
+    setPeople(prev=>{const next=prev.map(p=>p.id===childId?{...p,parentId:newParentId}:p);setHistory(h=>[...h,prev]);return next;});
     setSelected(null);
   },[]);
 
-  const handleUndo=()=>{
-    if(!history.length)return;
-    const prev=history[history.length-1];
-    setPeople(prev);
-    setHistory(h=>h.slice(0,-1));
+  const handleAddContact = (form) => {
+    setPeople(prev => { const newP={...form,id:String(Math.max(0,...prev.map(p=>parseInt(p.id)||0))+1)}; setHistory(h=>[...h,prev]); return [...prev,newP]; });
   };
-
-  const handleReset=()=>{
-    if(!companyMeta)return;
-    setPeople([...companyMeta.originalPeople]);
-    setHistory([]);
+  const handleUpdateContact = (updated) => {
+    setPeople(prev => { setHistory(h=>[...h,prev]); return prev.map(p=>p.id===updated.id?{...p,...updated}:p); });
+    setSelected(updated);
   };
+  const handleDeleteContact = (id) => {
+    setPeople(prev => { const person=prev.find(p=>p.id===id); if(!person)return prev; setHistory(h=>[...h,prev]); return prev.filter(p=>p.id!==id).map(p=>p.parentId===id?{...p,parentId:person.parentId}:p); });
+    setSelected(null);
+  };
+  const handleUndo=()=>{if(!history.length)return;setPeople(history[history.length-1]);setHistory(h=>h.slice(0,-1));};
+  const handleReset=()=>{if(!companyMeta)return;setPeople([...companyMeta.originalPeople]);setHistory([]);};
 
   const tree = companyMeta ? flatToTree(people, companyMeta.name, companyMeta.sources) : null;
   function countAll(n){if(!n)return 0;return 1+(n.children||[]).reduce((s,c)=>s+countAll(c),0);}
@@ -621,40 +690,43 @@ function App(){
     <div style={{height:'100vh',display:'flex',flexDirection:'column',overflow:'hidden'}}>
       {showSettings&&<ApiKeyModal apiKey={apiKey} pendingCompany={pendingCompany} onSave={saveKey}
         onClose={k=>{setShowSettings(false);setPendingCompany(null);if(k&&pendingCompany)runSearch(pendingCompany,k);}}/>}
+      {showAddContact&&<AddContactModal people={people} onSave={handleAddContact} onClose={()=>setShowAddContact(false)}/>}
 
       {screen==='search'&&<SearchScreen onSearch={handleSearch} apiKey={apiKey} onSettings={()=>setShowSettings(true)}/>}
       {screen==='loading'&&<LoadingScreen company={query}/>}
-
       {screen==='error'&&(
         <div style={{display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',height:'100%',gap:14,fontFamily:"-apple-system,'Segoe UI',sans-serif"}}>
-          <div style={{fontSize:44}}>😕</div>
+          <div style={{fontSize:44}}>&#128533;</div>
           <div style={{fontWeight:800,fontSize:19,color:'#0f172a'}}>Company not found</div>
           <div style={{color:'#64748b',fontSize:14,maxWidth:400,textAlign:'center',lineHeight:1.6}}>{error}</div>
           <div style={{display:'flex',gap:8}}>
-            <button onClick={()=>setScreen('search')} style={{padding:'10px 22px',borderRadius:10,fontSize:14,fontWeight:700,background:'linear-gradient(135deg,#6366f1,#8b5cf6)',color:'white',border:'none',cursor:'pointer'}}>Try another</button>
+            <button onClick={()=>setScreen('search')} className="btn-primary">Try another</button>
             {!apiKey&&<button onClick={()=>{setScreen('search');setShowSettings(true);}} style={{padding:'10px 22px',borderRadius:10,fontSize:14,fontWeight:700,background:'white',color:'#6366f1',border:'2px solid #6366f1',cursor:'pointer'}}>Enable live lookup</button>}
           </div>
         </div>
       )}
-
       {screen==='chart'&&tree&&(
         <>
-          <Toolbar
-            company={companyMeta.name} sources={companyMeta.sources} count={countAll(tree)}
+          <Toolbar company={companyMeta.name} sources={companyMeta.sources} count={countAll(tree)}
             canUndo={history.length>0} modified={history.length>0}
-            onBack={()=>{setScreen('search');setSelected(null);}}
+            onBack={()=>{setScreen('search');setSelected(null);setFinderOpen(false);}}
             onUndo={handleUndo} onReset={handleReset}
+            onAddContact={()=>setShowAddContact(true)}
+            onToggleFinder={()=>setFinderOpen(!finderOpen)} finderOpen={finderOpen}
           />
           <div style={{flex:1,overflow:'hidden',position:'relative',background:'#f8fafc'}}>
-            <OrgChart data={tree} onSelect={setSelected} onReparent={handleReparent}/>
-            <ContactPanel contact={selected} onClose={()=>setSelected(null)}/>
+            <PeopleFinder open={finderOpen} onClose={()=>setFinderOpen(false)} apiKey={apiKey}
+              people={people} onAddPerson={handleAddContact} companyName={companyMeta.name}
+              onRequestApiKey={()=>setShowSettings(true)} />
+            <OrgChart data={tree} onSelect={setSelected} onReparent={handleReparent} zoomRef={zoomRef}/>
+            <ContactPanel contact={selected} people={people} onClose={()=>setSelected(null)} onUpdate={handleUpdateContact} onDelete={handleDeleteContact}/>
+            <ZoomControls zoomRef={zoomRef}/>
           </div>
         </>
       )}
     </div>
   );
 }
-
 ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
 </script>
 </body>
